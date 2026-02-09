@@ -12,7 +12,8 @@ export async function getHealthStatus(): Promise<HealthStatus> {
   try {
     await prisma.$queryRaw`SELECT 1`
     databaseStatus = 'connected'
-  } catch {
+  } catch (error) {
+    console.error('[HEALTH] Database connection error:', error)
     databaseStatus = 'disconnected'
   }
 
