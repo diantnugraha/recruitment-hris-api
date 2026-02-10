@@ -107,6 +107,7 @@ model Division {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   departments Department[]
+  jobTitles   JobTitle[]
 
   @@index([name])
   @@index([code])
@@ -124,10 +125,79 @@ model Department {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  obs      Obs       @relation(fields: [obsId], references: [id])
-  division Division? @relation(fields: [divisionId], references: [id])
+  obs       Obs                  @relation(fields: [obsId], references: [id])
+  division  Division?            @relation(fields: [divisionId], references: [id])
+  jobTitles DepartmentJobTitle[]
 
   @@index([obsId])
   @@index([divisionId])
   @@map("departments")
+}
+
+enum JobLevelCategory {
+  Functional
+  Structural
+}
+
+model JobLevel {
+  id                BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  name              String            @unique @db.Char(100)
+  category          JobLevelCategory
+  description       String?           @db.Text
+  canCreateJobTitle Boolean           @default(false) @map("can_create_job_title")
+  canCreateKpi      Boolean           @default(false) @map("can_create_kpi")
+  order             Int?
+  createdAt         DateTime?         @default(now()) @map("created_at")
+  updatedAt         DateTime?         @updatedAt @map("updated_at")
+
+  jobTitles JobTitle[]
+
+  @@index([name])
+  @@index([category])
+  @@map("job_levels")
+}
+
+enum JobTitleType {
+  Administration
+  Technical
+}
+
+model JobTitle {
+  id             BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  name           String        @unique @db.Char(100)
+  jobLevelId     BigInt        @map("job_level_id") @db.UnsignedBigInt
+  divisionId     Int?          @map("division_id")
+  directReportId BigInt?       @map("direct_report_id") @db.UnsignedBigInt
+  description    String?       @db.Text
+  purpose        String?       @db.Text
+  requirement    String?       @db.Text
+  type           JobTitleType?
+  createdAt      DateTime?     @default(now()) @map("created_at")
+  updatedAt      DateTime?     @updatedAt @map("updated_at")
+
+  jobLevel     JobLevel   @relation(fields: [jobLevelId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  division     Division?  @relation(fields: [divisionId], references: [id])
+  directReport JobTitle?  @relation("DirectReport", fields: [directReportId], references: [id])
+  subordinates JobTitle[] @relation("DirectReport")
+
+  departments DepartmentJobTitle[]
+
+  @@index([jobLevelId])
+  @@index([directReportId])
+  @@index([divisionId])
+  @@index([name])
+  @@map("job_titles")
+}
+
+model DepartmentJobTitle {
+  jobTitleId   BigInt @map("job_title_id") @db.UnsignedBigInt
+  departmentId Int    @map("department_id")
+
+  jobTitle   JobTitle   @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([jobTitleId, departmentId])
+  @@index([jobTitleId])
+  @@index([departmentId])
+  @@map("department_job_title")
 }
