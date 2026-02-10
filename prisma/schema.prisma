@@ -21,7 +21,7 @@ model User {
   userImei        String?   @map("user_imei") @db.VarChar(100)
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
-  trash           DateTime?
+  trash           DateTime? @map("deleted_at")
 
   role     Role       @relation(fields: [roleId], references: [roleId])
   employee Employee?  @relation(fields: [employeeId], references: [employeeId])
@@ -80,4 +80,54 @@ model UserFile {
   @@index([userId])
   @@index([type])
   @@map("user_files")
+}
+
+// Organizational Breakdown Structure
+model Obs {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(255)
+  cluster     String?   @db.VarChar(100)
+  description String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  departments Department[]
+
+  @@index([name])
+  @@index([cluster])
+  @@map("obs")
+}
+
+model Division {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(255)
+  code        String?   @db.VarChar(50)
+  description String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  departments Department[]
+
+  @@index([name])
+  @@index([code])
+  @@map("divisions")
+}
+
+model Department {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  code        String    @unique @db.VarChar(100)
+  obsId       Int       @map("obs_id")
+  divisionId  Int?      @map("division_id")
+  category    String    @db.VarChar(50)
+  description String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  obs      Obs       @relation(fields: [obsId], references: [id])
+  division Division? @relation(fields: [divisionId], references: [id])
+
+  @@index([obsId])
+  @@index([divisionId])
+  @@map("departments")
 }

@@ -30,9 +30,15 @@ export async function findById(id: number): Promise<RepositoryResult<UserWithout
       where: { id, trash: null },
       select: {
         id: true,
-        email: true,
         name: true,
-        role: true,
+        email: true,
+        displayName: true,
+        roleId: true,
+        employeeId: true,
+        superiorId: true,
+        rememberToken: true,
+        emailVerifiedAt: true,
+        userImei: true,
         created_at: true,
         updated_at: true,
         trash: true
@@ -52,13 +58,20 @@ export async function create(data: CreateUserData): Promise<RepositoryResult<Use
         email: data.email,
         password: data.password,
         name: data.name,
-        role: data.role ?? 'user'
+        displayName: data.name,
+        role: { connect: { roleId: 1 } }
       },
       select: {
         id: true,
-        email: true,
         name: true,
-        role: true,
+        email: true,
+        displayName: true,
+        roleId: true,
+        employeeId: true,
+        superiorId: true,
+        rememberToken: true,
+        emailVerifiedAt: true,
+        userImei: true,
         created_at: true,
         updated_at: true,
         trash: true
