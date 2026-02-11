@@ -14,7 +14,7 @@ export type CreateJobTitleServiceData = {
   job_level_id: number
   division_id?: number
   direct_report_id?: number
-  type: JobTitleType
+  type?: JobTitleType
   description?: string
   purpose?: string
   requirement?: string
@@ -160,7 +160,7 @@ export async function createJobTitle(
     const createResult = await jobTitleRepository.create({
       name: data.name,
       job_level_id: data.job_level_id,
-      type: data.type,
+      ...(data.type !== undefined && { type: data.type }),
       ...(data.division_id !== undefined && { division_id: data.division_id }),
       ...(data.direct_report_id !== undefined && { direct_report_id: data.direct_report_id }),
       ...(data.description !== undefined && { description: data.description }),

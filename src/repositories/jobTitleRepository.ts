@@ -63,7 +63,7 @@ export type CreateJobTitleData = {
   job_level_id: number
   division_id?: number
   direct_report_id?: number
-  type: JobTitleType
+  type?: JobTitleType
   description?: string
   purpose?: string
   requirement?: string
@@ -220,7 +220,7 @@ export async function create(data: CreateJobTitleData): Promise<RepositoryResult
       data: {
         name: data.name,
         jobLevelId: BigInt(data.job_level_id),
-        type: data.type,
+        ...(data.type !== undefined && { type: data.type }),
         ...(data.division_id !== undefined && { divisionId: data.division_id }),
         ...(data.direct_report_id !== undefined && {
           directReportId: BigInt(data.direct_report_id)

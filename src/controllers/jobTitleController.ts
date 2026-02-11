@@ -75,7 +75,7 @@ export async function create(
   const data: Parameters<typeof jobTitleService.createJobTitle>[0] = {
     name: request.body.name,
     job_level_id: request.body.job_level_id,
-    type: request.body.type,
+    ...(request.body.type !== undefined && { type: request.body.type }),
     ...(request.body.division_id !== undefined && { division_id: request.body.division_id }),
     ...(request.body.direct_report_id !== undefined && {
       direct_report_id: request.body.direct_report_id
