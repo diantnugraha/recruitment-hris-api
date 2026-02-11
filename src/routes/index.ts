@@ -8,6 +8,7 @@ import { divisionRoutes } from './divisionRoutes.js'
 import { departmentRoutes } from './departmentRoutes.js'
 import { jobLevelRoutes } from './jobLevelRoutes.js'
 import { jobTitleRoutes } from './jobTitleRoutes.js'
+import { employeeRoutes } from './employeeRoutes.js'
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes, { prefix: '/health' })
@@ -18,4 +19,5 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(departmentRoutes, { prefix: '/v1/department' })
   await app.register(jobLevelRoutes, { prefix: '/v1/job-level' })
   await app.register(jobTitleRoutes, { prefix: '/v1/job-title' })
+  await app.register(employeeRoutes, { prefix: '/v1/employee' })
 }
