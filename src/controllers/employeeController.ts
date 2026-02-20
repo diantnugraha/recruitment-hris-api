@@ -4,6 +4,40 @@ import type { IdParam } from '../schemas/common.js'
 import type { EmployeeQuery, CreateEmployeeBody, UpdateEmployeeBody } from '../schemas/employeeSchemas.js'
 import * as employeeService from '../services/employeeService.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
+import { transformEmployees, transformEmployee, type DepartmentInfo } from '../transformers/employeeTransformer.js'
+import { prisma } from '../config/database.js'
+
+/**
+ * Build a lookup map: lowercase job title name → DepartmentInfo
+ * Resolves: job_titles → department_job_title → departments
+ */
+async function buildTitleToDeptMap(): Promise<Map<string, DepartmentInfo>> {
+  const jobTitles = await prisma.jobTitle.findMany({
+    include: {
+      departments: {
+        include: {
+          department: {
+            select: { id: true, name: true, code: true }
+          }
+        }
+      }
+    }
+  })
+
+  const map = new Map<string, DepartmentInfo>()
+  for (const jt of jobTitles) {
+    const firstLink = jt.departments[0]
+    if (firstLink) {
+      const dept = firstLink.department
+      map.set(jt.name.trim().toLowerCase(), {
+        id: dept.id,
+        name: dept.name,
+        code: dept.code
+      })
+    }
+  }
+  return map
+}
 
 export async function getAll(
   request: FastifyRequest<{ Querystring: EmployeeQuery }>,
@@ -22,11 +56,17 @@ export async function getAll(
 
   const pagination = { page, limit }
 
-  const result = await employeeService.getAllEmployees(filters, pagination)
+  const [result, titleToDeptMap] = await Promise.all([
+    employeeService.getAllEmployees(filters, pagination),
+    buildTitleToDeptMap()
+  ])
+
+  // Transform legacy schema to new API contract with department lookup
+  const transformedItems = transformEmployees(result.items, titleToDeptMap)
 
   const paginationData = calculatePagination(page, limit, result.total)
 
-  sendPaginated(reply, result.items, paginationData)
+  sendPaginated(reply, transformedItems, paginationData)
 }
 
 export async function getById(
@@ -35,9 +75,15 @@ export async function getById(
 ): Promise<void> {
   const { id } = request.params
 
-  const employee = await employeeService.getEmployeeById(id)
+  const [employee, titleToDeptMap] = await Promise.all([
+    employeeService.getEmployeeById(id),
+    buildTitleToDeptMap()
+  ])
 
-  sendSuccess(reply, employee)
+  // Transform legacy schema to new API contract with department lookup
+  const transformedEmployee = transformEmployee(employee, titleToDeptMap)
+
+  sendSuccess(reply, transformedEmployee)
 }
 
 export async function create(

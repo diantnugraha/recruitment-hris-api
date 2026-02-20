@@ -49,6 +49,7 @@ model Employee {
   employeeExt           String?   @map("employee_ext") @db.VarChar(50)
   employeeGender        String?   @map("employee_gender") @db.VarChar(10)
   employeeNickname      String?   @map("employee_nickname") @db.VarChar(50)
+  employeeNik           String?   @map("employee_nik") @db.VarChar(50)
   employeeName          String?   @map("employee_name") @db.VarChar(100)
   employeeContact       String?   @map("employee_contact") @db.VarChar(50)
   employeeEmail         String?   @map("employee_email") @db.VarChar(100)
