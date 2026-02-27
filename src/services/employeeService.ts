@@ -19,6 +19,17 @@ export type CreateEmployeeServiceData = {
   birthDate?: Date
   permanentDate?: Date
   superiorId?: number
+  nik?: string
+  maritalStatus?: string
+  address?: string
+  religion?: string
+  ethnic?: string
+  motherName?: string
+  fatherName?: string
+  spouseName?: string
+  emergencyName?: string
+  emergencyRelation?: string
+  emergencyPhone?: string
 }
 
 export type UpdateEmployeeServiceData = {
@@ -36,6 +47,17 @@ export type UpdateEmployeeServiceData = {
   birthDate?: Date
   permanentDate?: Date
   superiorId?: number | null
+  nik?: string
+  maritalStatus?: string
+  address?: string
+  religion?: string
+  ethnic?: string
+  motherName?: string
+  fatherName?: string
+  spouseName?: string
+  emergencyName?: string
+  emergencyRelation?: string
+  emergencyPhone?: string
 }
 
 export type PaginatedEmployees = {

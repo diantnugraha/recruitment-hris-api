@@ -106,7 +106,18 @@ export async function create(
     ...(body.join_date !== undefined && { joinDate: new Date(body.join_date) }),
     ...(body.birth_date !== undefined && { birthDate: new Date(body.birth_date) }),
     ...(body.permanent_date !== undefined && { permanentDate: new Date(body.permanent_date) }),
-    ...(body.superior_id !== undefined && { superiorId: body.superior_id })
+    ...(body.superior_id !== undefined && { superiorId: body.superior_id }),
+    ...(body.nik !== undefined && { nik: body.nik }),
+    ...(body.marital_status !== undefined && { maritalStatus: body.marital_status }),
+    ...(body.address !== undefined && { address: body.address }),
+    ...(body.religion !== undefined && { religion: body.religion }),
+    ...(body.ethnic !== undefined && { ethnic: body.ethnic }),
+    ...(body.mother_name !== undefined && { motherName: body.mother_name }),
+    ...(body.father_name !== undefined && { fatherName: body.father_name }),
+    ...(body.spouse_name !== undefined && { spouseName: body.spouse_name }),
+    ...(body.emergency_name !== undefined && { emergencyName: body.emergency_name }),
+    ...(body.emergency_relation !== undefined && { emergencyRelation: body.emergency_relation }),
+    ...(body.emergency_phone !== undefined && { emergencyPhone: body.emergency_phone })
   }
 
   const employee = await employeeService.createEmployee(data)
@@ -135,7 +146,18 @@ export async function update(
     ...(body.join_date !== undefined && { joinDate: new Date(body.join_date) }),
     ...(body.birth_date !== undefined && { birthDate: new Date(body.birth_date) }),
     ...(body.permanent_date !== undefined && { permanentDate: new Date(body.permanent_date) }),
-    ...(body.superior_id !== undefined && { superiorId: body.superior_id })
+    ...(body.superior_id !== undefined && { superiorId: body.superior_id }),
+    ...(body.nik !== undefined && { nik: body.nik }),
+    ...(body.marital_status !== undefined && { maritalStatus: body.marital_status }),
+    ...(body.address !== undefined && { address: body.address }),
+    ...(body.religion !== undefined && { religion: body.religion }),
+    ...(body.ethnic !== undefined && { ethnic: body.ethnic }),
+    ...(body.mother_name !== undefined && { motherName: body.mother_name }),
+    ...(body.father_name !== undefined && { fatherName: body.father_name }),
+    ...(body.spouse_name !== undefined && { spouseName: body.spouse_name }),
+    ...(body.emergency_name !== undefined && { emergencyName: body.emergency_name }),
+    ...(body.emergency_relation !== undefined && { emergencyRelation: body.emergency_relation }),
+    ...(body.emergency_phone !== undefined && { emergencyPhone: body.emergency_phone })
   }
 
   const employee = await employeeService.updateEmployee(id, data)

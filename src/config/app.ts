@@ -23,7 +23,11 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Security plugins
   await app.register(helmet)
-  await app.register(cors)
+  await app.register(cors, {
+    origin: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true
+  })
 
   // Error handler
   app.setErrorHandler(errorHandler)

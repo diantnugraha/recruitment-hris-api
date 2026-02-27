@@ -168,6 +168,17 @@ export async function create(data: CreateEmployeeData): Promise<RepositoryResult
     if (data.birthDate !== undefined) createData.employeeBirthdate = data.birthDate
     if (data.permanentDate !== undefined) createData.employeePermanentdate = data.permanentDate
     if (data.superiorId !== undefined) createData.superiorId = data.superiorId
+    if (data.nik !== undefined) createData.employeeNik = data.nik
+    if (data.maritalStatus !== undefined) createData.employeeMaritalstatus = data.maritalStatus
+    if (data.address !== undefined) createData.employeeAddress = data.address
+    if (data.religion !== undefined) createData.employeeReligion = data.religion
+    if (data.ethnic !== undefined) createData.employeeEthnic = data.ethnic
+    if (data.motherName !== undefined) createData.employeeMother = data.motherName
+    if (data.fatherName !== undefined) createData.employeeFather = data.fatherName
+    if (data.spouseName !== undefined) createData.employeeSpouse = data.spouseName
+    if (data.emergencyName !== undefined) createData.employeeEmgName = data.emergencyName
+    if (data.emergencyRelation !== undefined) createData.employeeEmgRel = data.emergencyRelation
+    if (data.emergencyPhone !== undefined) createData.employeeEmgPhone = data.emergencyPhone
 
     const employee = await prisma.employee.create({ data: createData })
     return success(employee)
@@ -195,6 +206,17 @@ export async function update(id: number, data: UpdateEmployeeData): Promise<Repo
     if (data.birthDate !== undefined) updateData.employeeBirthdate = data.birthDate
     if (data.permanentDate !== undefined) updateData.employeePermanentdate = data.permanentDate
     if (data.superiorId !== undefined) updateData.superiorId = data.superiorId
+    if (data.nik !== undefined) updateData.employeeNik = data.nik
+    if (data.maritalStatus !== undefined) updateData.employeeMaritalstatus = data.maritalStatus
+    if (data.address !== undefined) updateData.employeeAddress = data.address
+    if (data.religion !== undefined) updateData.employeeReligion = data.religion
+    if (data.ethnic !== undefined) updateData.employeeEthnic = data.ethnic
+    if (data.motherName !== undefined) updateData.employeeMother = data.motherName
+    if (data.fatherName !== undefined) updateData.employeeFather = data.fatherName
+    if (data.spouseName !== undefined) updateData.employeeSpouse = data.spouseName
+    if (data.emergencyName !== undefined) updateData.employeeEmgName = data.emergencyName
+    if (data.emergencyRelation !== undefined) updateData.employeeEmgRel = data.emergencyRelation
+    if (data.emergencyPhone !== undefined) updateData.employeeEmgPhone = data.emergencyPhone
 
     const employee = await prisma.employee.update({
       where: { employeeId: id },
