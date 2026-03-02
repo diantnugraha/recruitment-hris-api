@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
+import type { DepartmentCategory } from '../constants/departmentConstants.js'
 import type { DepartmentQuery, CreateDepartmentBody, UpdateDepartmentBody } from '../schemas/departmentSchemas.js'
 import * as departmentService from '../services/departmentService.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
@@ -17,7 +18,7 @@ export async function getAll(
     ...(description && { description }),
     ...(obs_id && { obsId: obs_id }),
     ...(division_id && { divisionId: division_id }),
-    ...(category && { category })
+    ...(category && { category: category as DepartmentCategory })
   }
 
   const pagination = { page, limit }
@@ -49,7 +50,7 @@ export async function create(
     code: request.body.code,
     obsId: request.body.obsId,
     divisionId: request.body.divisionId,
-    category: request.body.category,
+    category: request.body.category as DepartmentCategory,
     description: request.body.description
   }
 
@@ -68,7 +69,7 @@ export async function update(
     code: request.body.code,
     obsId: request.body.obsId,
     divisionId: request.body.divisionId,
-    category: request.body.category,
+    category: request.body.category as DepartmentCategory,
     description: request.body.description
   }
 

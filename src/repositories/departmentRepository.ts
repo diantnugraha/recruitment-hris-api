@@ -1,11 +1,11 @@
-import type { Department, Obs, Division, Prisma } from '@prisma/client'
+import type { Department, Obs, Prisma } from '@prisma/client'
 
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
+import { type DepartmentCategory, toPrismaCategory } from '../constants/departmentConstants.js'
 
 export type DepartmentWithRelations = Department & {
   obs: Pick<Obs, 'id' | 'name' | 'cluster'>
-  division: Pick<Division, 'id' | 'name' | 'code'> | null
 }
 
 export type DepartmentFilters = {
@@ -14,7 +14,7 @@ export type DepartmentFilters = {
   description?: string
   obsId?: number
   divisionId?: number
-  category?: string
+  category?: DepartmentCategory
 }
 
 export type PaginationParams = {
@@ -32,7 +32,7 @@ export type CreateDepartmentData = {
   code: string
   obsId: number
   divisionId?: number
-  category: string
+  category: DepartmentCategory
   description?: string
 }
 
@@ -41,7 +41,7 @@ export type UpdateDepartmentData = {
   code: string
   obsId: number
   divisionId?: number
-  category: string
+  category: DepartmentCategory
   description?: string
 }
 
@@ -61,13 +61,6 @@ const departmentSelectFields = {
       name: true,
       cluster: true
     }
-  },
-  division: {
-    select: {
-      id: true,
-      name: true,
-      code: true
-    }
   }
 } as const
 
@@ -82,7 +75,7 @@ export async function findAll(
       ...(filters.description && { description: { contains: filters.description } }),
       ...(filters.obsId && { obsId: filters.obsId }),
       ...(filters.divisionId && { divisionId: filters.divisionId }),
-      ...(filters.category && { category: filters.category })
+      ...(filters.category && { category: toPrismaCategory(filters.category) })
     }
 
     const [items, total] = await prisma.$transaction([
@@ -124,7 +117,7 @@ export async function create(data: CreateDepartmentData): Promise<RepositoryResu
         code: data.code,
         obsId: data.obsId,
         divisionId: data.divisionId,
-        category: data.category,
+        category: toPrismaCategory(data.category),
         description: data.description
       },
       select: departmentSelectFields
@@ -145,7 +138,7 @@ export async function update(id: number, data: UpdateDepartmentData): Promise<Re
         code: data.code,
         obsId: data.obsId,
         divisionId: data.divisionId,
-        category: data.category,
+        category: toPrismaCategory(data.category),
         description: data.description
       },
       select: departmentSelectFields

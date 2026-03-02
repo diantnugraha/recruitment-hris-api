@@ -24,9 +24,35 @@ export type TransformedEmployee = {
   job_title_id: string | null
   job_level_id: string | null
   manager_id: string | null
+  superior_id: string | null
   photo: string | null
   created_at: string
   updated_at: string
+  // Employment details
+  employee_type: string | null
+  employee_bu: string | null
+  employee_ext: string | null
+  employee_location: string | null
+  fte: number | null
+  // Contract & probation dates
+  employee_permanentdate: string | null
+  employee_contractdate: string | null
+  employee_contractenddate: string | null
+  employee_probationdate: string | null
+  employee_probationenddate: string | null
+  // Family
+  employee_mother: string | null
+  employee_father: string | null
+  employee_spouse: string | null
+  employee_maritalstatus: string | null
+  // Emergency contact
+  employee_emg_name: string | null
+  employee_emg_rel: string | null
+  employee_emg_phone: string | null
+  // Additional
+  employee_religion: string | null
+  employee_ethnic: string | null
+  // Relations
   department: {
     id: string
     name: string
@@ -166,9 +192,39 @@ export function transformEmployee(
     job_title_id: jobTitleId,
     job_level_id: null,
     manager_id: employee.superiorId?.toString() ?? null,
+    superior_id: employee.superiorId?.toString() ?? null,
     photo: employee.employeeImages ?? null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+
+    // Employment details
+    employee_type: null,
+    employee_bu: employee.employeeBu ?? null,
+    employee_ext: employee.employeeExt ?? null,
+    employee_location: employee.employeeLocation ?? null,
+    fte: null,
+
+    // Contract & probation dates
+    employee_permanentdate: formatDate(employee.employeePermanentdate),
+    employee_contractdate: null,
+    employee_contractenddate: null,
+    employee_probationdate: null,
+    employee_probationenddate: null,
+
+    // Family
+    employee_mother: employee.employeeMother ?? null,
+    employee_father: employee.employeeFather ?? null,
+    employee_spouse: employee.employeeSpouse ?? null,
+    employee_maritalstatus: employee.employeeMaritalstatus ?? null,
+
+    // Emergency contact
+    employee_emg_name: employee.employeeEmgName ?? null,
+    employee_emg_rel: employee.employeeEmgRel ?? null,
+    employee_emg_phone: employee.employeeEmgPhone ?? null,
+
+    // Additional
+    employee_religion: employee.employeeReligion ?? null,
+    employee_ethnic: employee.employeeEthnic ?? null,
 
     // Department resolved from job_title → department_job_title → departments
     department: resolvedDept

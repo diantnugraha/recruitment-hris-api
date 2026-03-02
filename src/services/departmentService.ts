@@ -1,4 +1,5 @@
 import { NotFoundError, ConflictError, ValidationError } from '../errors/index.js'
+import type { DepartmentCategory } from '../constants/departmentConstants.js'
 import * as departmentRepository from '../repositories/departmentRepository.js'
 import * as obsRepository from '../repositories/obsRepository.js'
 import * as divisionRepository from '../repositories/divisionRepository.js'
@@ -9,7 +10,7 @@ export type CreateDepartmentServiceData = {
   code: string
   obsId: number
   divisionId?: number
-  category: string
+  category: DepartmentCategory
   description?: string
 }
 
@@ -18,7 +19,7 @@ export type UpdateDepartmentServiceData = {
   code: string
   obsId: number
   divisionId?: number
-  category: string
+  category: DepartmentCategory
   description?: string
 }
 

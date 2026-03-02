@@ -21,13 +21,13 @@ export async function createApp(): Promise<FastifyInstance> {
     logger: process.env.NODE_ENV !== 'production'
   })
 
-  // Security plugins
-  await app.register(helmet)
+  // CORS must be registered before helmet
   await app.register(cors, {
-    origin: true,
+    origin: ['http://localhost:8080', 'http://127.0.0.1:8080'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true
   })
+  await app.register(helmet)
 
   // Error handler
   app.setErrorHandler(errorHandler)

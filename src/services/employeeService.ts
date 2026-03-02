@@ -166,7 +166,8 @@ export async function updateEmployee(id: number, data: UpdateEmployeeServiceData
     }
   }
 
-  if (data.superiorId !== undefined && data.superiorId !== null) {
+  // Only validate superior if it's set and not 0 (0 means "No Superior")
+  if (data.superiorId !== undefined && data.superiorId !== null && data.superiorId !== 0) {
     if (data.superiorId === id) {
       throw new ValidationError('Employee cannot be their own superior')
     }

@@ -20,18 +20,21 @@ interface ErrorResponse {
   code?: string
 }
 
+export function successResponse<T>(data: T, message?: string): SuccessResponse<T> {
+  return {
+    success: true,
+    data,
+    ...(message && { message })
+  }
+}
+
 export function sendSuccess<T>(
   reply: FastifyReply,
   data: T,
   message?: string,
   statusCode: number = 200
 ): void {
-  const response: SuccessResponse<T> = {
-    success: true,
-    data,
-    ...(message && { message })
-  }
-  reply.status(statusCode).send(response)
+  reply.status(statusCode).send(successResponse(data, message))
 }
 
 export function sendPaginated<T>(
