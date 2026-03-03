@@ -16,13 +16,19 @@ export type UpdateDetailData = {
   candidateVerify?: boolean
 }
 
-// Generate candidate code: CR-YYYYMM-XXXX
-function generateCandidateCode(): string {
+// Generate candidate code: AP.YYMMDDXXXX (sequential per day)
+async function generateCandidateCode(): Promise<string> {
   const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
-  return `CR-${year}${month}-${random}`
+  const yy = String(now.getFullYear()).slice(-2)
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const prefix = `AP.${yy}${mm}${dd}`
+
+  const count = await prisma.candidate_recruitment_detail.count({
+    where: { candidate_code: { startsWith: prefix } }
+  })
+
+  return `${prefix}${String(count + 1).padStart(4, '0')}`
 }
 
 export async function findById(id: number): Promise<RepositoryResult<candidate_recruitment_detail | null>> {
@@ -75,7 +81,7 @@ export async function findByToken(token: string): Promise<RepositoryResult<candi
 
 export async function create(data: CreateDetailData): Promise<RepositoryResult<candidate_recruitment_detail>> {
   try {
-    const candidateCode = generateCandidateCode()
+    const candidateCode = await generateCandidateCode()
     const candidateToken = randomBytes(32).toString('hex')
 
     const detail = await prisma.candidate_recruitment_detail.create({
