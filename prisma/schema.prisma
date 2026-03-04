@@ -19,8 +19,8 @@ model User {
   rememberToken   String?   @map("remember_token") @db.VarChar(100)
   emailVerifiedAt DateTime? @map("email_verified_at")
   userImei        String?   @map("user_imei") @db.VarChar(100)
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  created_at      DateTime? @default(now())
+  updated_at      DateTime? @updatedAt
   trash           DateTime? @map("deleted_at")
 
   role     Role       @relation(fields: [roleId], references: [roleId])

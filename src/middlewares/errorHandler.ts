@@ -2,8 +2,16 @@ import type { FastifyError, FastifyRequest, FastifyReply } from 'fastify'
 
 import { AppError } from '../errors/index.js'
 
+interface ErrorWithStatus {
+  status?: number
+  statusCode?: number
+  message?: string
+  code?: string
+  details?: string
+}
+
 export function errorHandler(
-  error: FastifyError | Error,
+  error: FastifyError | Error | ErrorWithStatus,
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
@@ -17,11 +25,23 @@ export function errorHandler(
   }
 
   // Handle Fastify validation errors
-  if ('validation' in error && error.validation) {
+  if ('validation' in error && (error as FastifyError).validation) {
     reply.status(400).send({
       success: false,
       message: error.message,
       code: 'VALIDATION_ERROR'
+    })
+    return
+  }
+
+  // Handle errors with status property (from external sources)
+  const errWithStatus = error as ErrorWithStatus
+  if (errWithStatus.status || errWithStatus.statusCode) {
+    const status = errWithStatus.status || errWithStatus.statusCode || 500
+    reply.status(status).send({
+      success: false,
+      message: errWithStatus.message || 'An error occurred',
+      code: errWithStatus.code || (status === 401 ? 'UNAUTHORIZED' : 'ERROR')
     })
     return
   }
