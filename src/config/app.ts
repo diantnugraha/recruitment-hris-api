@@ -18,7 +18,7 @@ BigInt.prototype.toJSON = function () {
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: process.env.NODE_ENV !== 'production'
+    logger: process.env.NODE_ENV === 'production'
   })
 
   // CORS must be registered before helmet

@@ -2,7 +2,7 @@ import { Type, type Static } from '@sinclair/typebox'
 
 export const PaginationQuerySchema = Type.Object({
   page: Type.Optional(Type.Integer({ minimum: 1, default: 1 })),
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, default: 20 })),
+  limit: Type.Optional(Type.Integer({ minimum: 1, default: 20 })),
   search: Type.Optional(Type.String())
 })
 
