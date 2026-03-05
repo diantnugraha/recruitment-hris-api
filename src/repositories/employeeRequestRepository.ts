@@ -3,11 +3,12 @@ import type { EmployeeRequest, EmployeeRequestComment, Prisma } from '@prisma/cl
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
 
-// Status mapping: DB uses Int (0-7), API uses string
+// Status mapping: DB uses Int (0-8), API uses string
 export const STATUS_MAP: Record<number, string> = {
   0: 'draft',
-  1: 'created',
-  2: 'reviewed',
+  1: 'created',           // Waiting for HOD Review
+  8: 'hod_reviewed',      // HOD Reviewed, waiting for HR Review
+  2: 'reviewed',          // HR Reviewed, waiting for Management Approval
   3: 'approved',
   4: 'rejected',
   5: 'revise',
@@ -18,6 +19,7 @@ export const STATUS_MAP: Record<number, string> = {
 export const STATUS_REVERSE_MAP: Record<string, number> = {
   draft: 0,
   created: 1,
+  hod_reviewed: 8,
   reviewed: 2,
   approved: 3,
   rejected: 4,
@@ -260,7 +262,8 @@ export async function create(data: CreateEmployeeRequestData): Promise<Repositor
         statusRecruitment: 0,
         codeRecruitment: '',
         createdBy: data.createdBy,
-        isDeleted: 0
+        isDeleted: 0,
+        createdAt: new Date()
       },
       include: includeRelations
     })
@@ -372,6 +375,7 @@ export async function getStats(): Promise<RepositoryResult<Record<string, number
       total: 0,
       draft: 0,
       created: 0,
+      hod_reviewed: 0,
       reviewed: 0,
       approved: 0,
       rejected: 0,

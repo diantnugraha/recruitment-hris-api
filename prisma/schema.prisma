@@ -262,7 +262,7 @@ model EmployeeRequest {
   budget                String                @db.VarChar(50)
   reviewedAt            DateTime?             @map("reviewed_at") @db.Timestamp(0)
   approvedAt            DateTime?             @map("approved_at") @db.Timestamp(0)
-  createdAt             DateTime?             @map("created_at") @db.Timestamp(0)
+  createdAt             DateTime?             @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt             DateTime?             @updatedAt @map("updated_at") @db.Timestamp(0)
 
   createdByUser User                      @relation(fields: [createdBy], references: [id])

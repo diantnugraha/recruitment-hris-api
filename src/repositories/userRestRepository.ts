@@ -57,7 +57,7 @@ const userSelectFields = {
   roleId: true,
   employeeId: true,
   superiorId: true,
-  emailVerifiedAt: true,
+  // emailVerifiedAt: true, // temporarily disabled to test
   created_at: true,
   updated_at: true,
   role: {

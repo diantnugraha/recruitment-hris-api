@@ -1,8 +1,9 @@
 // Employee Request Status - Workflow states
 export const EMPLOYEE_REQUEST_STATUS = {
   DRAFT: 'draft',
-  CREATED: 'created',
-  REVIEWED: 'reviewed',
+  CREATED: 'created',           // Waiting for HOD Review
+  HOD_REVIEWED: 'hod_reviewed', // HOD Reviewed, waiting for HR Review
+  REVIEWED: 'reviewed',         // HR Reviewed, waiting for Management Approval
   APPROVED: 'approved',
   REJECTED: 'rejected',
   REVISE: 'revise',
@@ -74,10 +75,17 @@ export const WORKFLOW_TRANSITIONS: Record<EmployeeRequestStatus, {
     allowedRoles: ['manager', 'head', 'admin'],
   },
   created: {
+    // HOD Review: HOD can approve to hod_reviewed or request revise
+    nextStatuses: ['hod_reviewed', 'revise'],
+    allowedRoles: ['hod', 'head', 'admin'],
+  },
+  hod_reviewed: {
+    // HR Review: HR can approve to reviewed or request revise
     nextStatuses: ['reviewed', 'revise'],
     allowedRoles: ['hr', 'admin'],
   },
   reviewed: {
+    // Management Approval: Management can approve or reject
     nextStatuses: ['approved', 'rejected'],
     allowedRoles: ['management', 'admin'],
   },
