@@ -53,7 +53,10 @@ export type CreateCandidateData = {
   marritalStatus?: string | undefined
   gender?: 'M' | 'F' | undefined
   mobilePhone?: string | undefined
+  domicileAddress?: string | undefined
   drivingLicense?: string | undefined
+  uniformShirtSize?: string | undefined
+  uniformPantsSize?: string | undefined
   // Link to employee request
   employeeRequestId?: number | undefined
   jobTitleId?: number | undefined
@@ -373,7 +376,10 @@ export async function update(id: number, data: UpdateCandidateData): Promise<Rep
     if (data.marritalStatus !== undefined) updateData.marrital_status = data.marritalStatus
     if (data.gender !== undefined) updateData.gender = data.gender
     if (data.mobilePhone !== undefined) updateData.mobile_phone = data.mobilePhone
+    if (data.domicileAddress !== undefined) updateData.domicile_address = data.domicileAddress
     if (data.drivingLicense !== undefined) updateData.driving_license = data.drivingLicense
+    if (data.uniformShirtSize !== undefined) updateData.uniform_shirt_size = data.uniformShirtSize
+    if (data.uniformPantsSize !== undefined) updateData.uniform_pants_size = data.uniformPantsSize
 
     const candidate = await prisma.candidateRecruitment.update({
       where: { id: BigInt(id) },

@@ -20,7 +20,11 @@ export const CandidateProfileUpdateSchema = Type.Object({
   bpjsId: Type.Optional(Type.String()),
   citizenship: Type.Optional(Type.String()),
   marritalStatus: Type.Optional(Type.String()),
-  drivingLicense: Type.Optional(Type.String())
+  residentStatus: Type.Optional(Type.String()),
+  domicileAddress: Type.Optional(Type.String()),
+  drivingLicense: Type.Optional(Type.String()),
+  uniformShirtSize: Type.Optional(Type.String()),
+  uniformPantsSize: Type.Optional(Type.String()),
 })
 
 export type CandidateProfileUpdate = Static<typeof CandidateProfileUpdateSchema>

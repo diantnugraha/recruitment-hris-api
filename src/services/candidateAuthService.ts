@@ -159,7 +159,11 @@ export async function updateProfile(
   if (data.bpjsId !== undefined) updateData.bpjsId = data.bpjsId
   if (data.citizenship !== undefined) updateData.citizenship = data.citizenship
   if (data.marritalStatus !== undefined) updateData.marritalStatus = data.marritalStatus
+  if (data.residentStatus !== undefined) updateData.residentStatus = data.residentStatus
+  if (data.domicileAddress !== undefined) updateData.domicileAddress = data.domicileAddress
   if (data.drivingLicense !== undefined) updateData.drivingLicense = data.drivingLicense
+  if (data.uniformShirtSize !== undefined) updateData.uniformShirtSize = data.uniformShirtSize
+  if (data.uniformPantsSize !== undefined) updateData.uniformPantsSize = data.uniformPantsSize
 
   const result = await candidateRepository.update(candidateId, updateData)
 

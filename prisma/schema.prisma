@@ -308,20 +308,23 @@ model CandidateRecruitment {
   birth_place    String          @db.VarChar(32)
   birth_date     DateTime        @db.Date
   religion       String          @db.VarChar(32)
-  ethnic_group   String          @db.VarChar(32)
+  ethnic_group   String?         @db.VarChar(32)
   id_no          String          @db.VarChar(32)
   tax_id         String          @db.VarChar(32)
   bpjs_id        String          @db.VarChar(32)
   citizenship    String          @db.VarChar(32)
   marrital_status String         @db.VarChar(32)
-  gender         CandidateGender
+  gender         CandidateGender?
   mobile_phone   String          @db.VarChar(32)
+  domicile_address String?       @db.Text
   driving_license String         @db.VarChar(32)
   document_1     String          @db.Text
   document_2     String          @db.Text
+  uniform_shirt_size  String?    @db.VarChar(10)
+  uniform_pants_size  String?    @db.VarChar(10)
   agreementAcceptedAt DateTime?  @map("agreement_accepted_at") @db.Timestamp(0)
   agreementVersion    String?    @map("agreement_version") @db.VarChar(20)
-  createdAt      DateTime?       @map("created_at") @db.Timestamp(0)
+  createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime?       @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment")
