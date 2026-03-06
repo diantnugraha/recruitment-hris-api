@@ -11,11 +11,11 @@ import {
 import { Type } from '@sinclair/typebox'
 
 export async function candidateAuthRoutes(app: FastifyInstance): Promise<void> {
-  // POST /v1/candidate-auth/login - Login with email + token
+  // POST /v1/candidate-auth/login - Login with email + password
   app.post('/login', {
     schema: {
       tags: ['Candidate Auth'],
-      summary: 'Candidate login with email and token',
+      summary: 'Candidate login with email and password',
       body: CandidateLoginBodySchema,
       response: {
         200: Type.Object({
@@ -27,14 +27,14 @@ export async function candidateAuthRoutes(app: FastifyInstance): Promise<void> {
     handler: candidateAuthController.login
   })
 
-  // POST /v1/candidate-auth/verify - Verify token validity
+  // POST /v1/candidate-auth/verify - Verify password validity
   app.post('/verify', {
     schema: {
       tags: ['Candidate Auth'],
-      summary: 'Verify candidate token validity',
+      summary: 'Verify candidate password validity',
       body: Type.Object({
         email: Type.String({ format: 'email' }),
-        token: Type.String()
+        password: Type.String()
       }),
       response: {
         200: Type.Object({
@@ -45,7 +45,7 @@ export async function candidateAuthRoutes(app: FastifyInstance): Promise<void> {
         })
       }
     },
-    handler: candidateAuthController.verifyToken
+    handler: candidateAuthController.verifyPassword
   })
 
   // GET /v1/candidate-auth/profile - Get authenticated candidate profile
@@ -81,5 +81,25 @@ export async function candidateAuthRoutes(app: FastifyInstance): Promise<void> {
     },
     preHandler: authenticateCandidate,
     handler: candidateAuthController.updateProfile
+  })
+
+  // POST /v1/candidate-auth/agreement - Accept data consent agreement
+  app.post('/agreement', {
+    schema: {
+      tags: ['Candidate Auth'],
+      summary: 'Accept data consent agreement (requires auth)',
+      security: [{ bearerAuth: [] }],
+      body: Type.Object({
+        version: Type.Optional(Type.String())
+      }),
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: CandidateResponseSchema
+        })
+      }
+    },
+    preHandler: authenticateCandidate,
+    handler: candidateAuthController.acceptAgreement
   })
 }

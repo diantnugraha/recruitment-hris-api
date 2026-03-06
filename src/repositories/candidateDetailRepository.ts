@@ -1,7 +1,8 @@
 import type { candidate_recruitment_detail, Prisma } from '@prisma/client'
-import { randomBytes } from 'crypto'
+import bcrypt from 'bcryptjs'
 
 import { prisma } from '../config/database.js'
+import { AUTH_CONSTANTS } from '../constants/authConstants.js'
 import { type RepositoryResult, success, failure } from './types.js'
 
 export type CreateDetailData = {
@@ -82,7 +83,8 @@ export async function findByToken(token: string): Promise<RepositoryResult<candi
 export async function create(data: CreateDetailData): Promise<RepositoryResult<candidate_recruitment_detail>> {
   try {
     const candidateCode = await generateCandidateCode()
-    const candidateToken = randomBytes(32).toString('hex')
+    // Placeholder token - will be set when invitation is sent
+    const candidateToken = ''
 
     const detail = await prisma.candidate_recruitment_detail.create({
       data: {
@@ -91,7 +93,8 @@ export async function create(data: CreateDetailData): Promise<RepositoryResult<c
         employee_request_id: String(data.employeeRequestId),
         candidate_code: candidateCode,
         candidate_token: candidateToken,
-        candidate_verify: 'NOT_VERIFIED'
+        candidate_verify: 'NOT_VERIFIED',
+        createdAt: new Date()
       }
     })
 
@@ -172,6 +175,68 @@ export async function countByEmployeeRequestId(employeeRequestId: number): Promi
     return success(count)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to count candidates'
+    return failure(message)
+  }
+}
+
+export async function setPassword(candidateId: number, password: string): Promise<RepositoryResult<boolean>> {
+  try {
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(password, AUTH_CONSTANTS.BCRYPT_ROUNDS)
+
+    // Use raw SQL to set created_at without triggering updated_at
+    await prisma.$executeRaw`
+      UPDATE candidate_recruitment_detail
+      SET candidate_token = ${hashedPassword}, created_at = NOW()
+      WHERE candidate_id = ${candidateId}
+    `
+    return success(true)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set password'
+    return failure(message)
+  }
+}
+
+export async function findByEmailWithDetail(email: string): Promise<RepositoryResult<{
+  candidate: { id: bigint; email: string; fullname: string; verify: string } | null
+  detail: candidate_recruitment_detail | null
+}>> {
+  try {
+    const candidate = await prisma.candidateRecruitment.findFirst({
+      where: { email },
+      select: { id: true, email: true, fullname: true, verify: true }
+    })
+
+    if (!candidate) {
+      return success({ candidate: null, detail: null })
+    }
+
+    const detail = await prisma.candidate_recruitment_detail.findFirst({
+      where: { candidate_id: Number(candidate.id) }
+    })
+
+    return success({ candidate, detail })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to find candidate with detail'
+    return failure(message)
+  }
+}
+
+export async function verifyPassword(candidateId: number, password: string): Promise<RepositoryResult<boolean>> {
+  try {
+    const detail = await prisma.candidate_recruitment_detail.findFirst({
+      where: { candidate_id: candidateId },
+      select: { candidate_token: true }
+    })
+
+    if (!detail || !detail.candidate_token) {
+      return success(false)
+    }
+
+    const isValid = await bcrypt.compare(password, detail.candidate_token)
+    return success(isValid)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to verify password'
     return failure(message)
   }
 }

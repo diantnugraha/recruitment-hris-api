@@ -4,71 +4,107 @@ import type { CandidateRecruitment } from '@prisma/client'
 import { JWT_CONFIG } from '../config/jwt.js'
 import { AppError, UnauthorizedError, NotFoundError } from '../errors/index.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
+import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import type { CandidateLoginBody, CandidateProfileUpdate } from '../schemas/candidateAuthSchemas.js'
 import type { CandidateJwtPayload } from '../middlewares/candidateAuthMiddleware.js'
 
 export interface CandidateAuthResult {
-  candidate: CandidateRecruitment
+  candidate: CandidateRecruitment & { candidateCode?: string }
   token: string
 }
 
 const CANDIDATE_TOKEN_EXPIRES_IN = '24h' // Shorter lifespan for candidate tokens
 
 export async function login(data: CandidateLoginBody): Promise<CandidateAuthResult> {
-  // Find candidate by email first
-  const emailResult = await candidateRepository.findByEmail(data.email)
+  // Find candidate by email with detail
+  const result = await candidateDetailRepository.findByEmailWithDetail(data.email)
 
-  if (emailResult.isFailure()) {
-    throw new AppError(500, emailResult.error)
+  if (result.isFailure()) {
+    throw new AppError(500, result.error)
   }
 
-  const candidate = emailResult.getValue()
+  const { candidate, detail } = result.getValue()
 
   if (!candidate) {
-    throw new UnauthorizedError('Invalid email or token')
+    throw new UnauthorizedError('Invalid email or password')
   }
 
-  // Verify token matches
-  if (!candidate.token || candidate.token !== data.token) {
-    throw new UnauthorizedError('Invalid email or token')
+  if (!detail) {
+    throw new UnauthorizedError('Account not found. Please contact HR.')
+  }
+
+  // Verify password using bcrypt
+  if (!detail.candidate_token) {
+    throw new UnauthorizedError('Invalid email or password')
+  }
+
+  const verifyResult = await candidateDetailRepository.verifyPassword(Number(candidate.id), data.password)
+  if (verifyResult.isFailure()) {
+    throw new AppError(500, verifyResult.error)
+  }
+
+  if (!verifyResult.getValue()) {
+    throw new UnauthorizedError('Invalid email or password')
+  }
+
+  // Get full candidate record
+  const fullCandidateResult = await candidateRepository.findByEmail(data.email)
+  if (fullCandidateResult.isFailure()) {
+    throw new AppError(500, fullCandidateResult.error)
+  }
+
+  const fullCandidate = fullCandidateResult.getValue()
+  if (!fullCandidate) {
+    throw new UnauthorizedError('Invalid email or password')
   }
 
   // Mark as verified on first login
-  if (candidate.verify === 'NOT_VERIFIED') {
-    await candidateRepository.verifyCandidate(Number(candidate.id))
+  if (fullCandidate.verify === 'NOT_VERIFIED') {
+    await candidateRepository.verifyCandidate(Number(fullCandidate.id))
   }
 
   // Generate JWT
   const jwtToken = generateCandidateToken({
-    candidateId: Number(candidate.id),
-    email: candidate.email,
+    candidateId: Number(fullCandidate.id),
+    email: fullCandidate.email,
     type: 'candidate'
   })
 
-  return { candidate, token: jwtToken }
+  // Include candidate_code from detail
+  const candidateWithCode = {
+    ...fullCandidate,
+    candidateCode: detail.candidate_code
+  }
+
+  return { candidate: candidateWithCode, token: jwtToken }
 }
 
-export async function verifyToken(email: string, token: string): Promise<boolean> {
-  const result = await candidateRepository.findByEmail(email)
+export async function verifyPassword(email: string, password: string): Promise<boolean> {
+  const result = await candidateDetailRepository.findByEmailWithDetail(email)
 
   if (result.isFailure()) {
     return false
   }
 
-  const candidate = result.getValue()
+  const { candidate, detail } = result.getValue()
 
-  if (!candidate) {
+  if (!candidate || !detail) {
     return false
   }
 
-  if (!candidate.token || candidate.token !== token) {
+  if (!detail.candidate_token) {
     return false
   }
 
-  return true
+  const verifyResult = await candidateDetailRepository.verifyPassword(Number(candidate.id), password)
+  if (verifyResult.isFailure()) {
+    return false
+  }
+
+  return verifyResult.getValue()
 }
 
-export async function getProfile(candidateId: number): Promise<CandidateRecruitment> {
+export async function getProfile(candidateId: number): Promise<CandidateRecruitment & { candidateCode?: string }> {
   const result = await candidateRepository.findById(candidateId)
 
   if (result.isFailure()) {
@@ -81,7 +117,16 @@ export async function getProfile(candidateId: number): Promise<CandidateRecruitm
     throw new NotFoundError('Candidate not found')
   }
 
-  return candidate
+  // Get candidate code from detail
+  const detailResult = await candidateDetailRepository.findByEmailWithDetail(candidate.email)
+  let candidateCode: string | undefined
+
+  if (detailResult.isSuccess()) {
+    const { detail } = detailResult.getValue()
+    candidateCode = detail?.candidate_code || undefined
+  }
+
+  return { ...candidate, candidateCode }
 }
 
 export async function updateProfile(
@@ -117,6 +162,19 @@ export async function updateProfile(
   if (data.drivingLicense !== undefined) updateData.drivingLicense = data.drivingLicense
 
   const result = await candidateRepository.update(candidateId, updateData)
+
+  if (result.isFailure()) {
+    throw new AppError(500, result.error)
+  }
+
+  return result.getValue()
+}
+
+export async function acceptAgreement(
+  candidateId: number,
+  version?: string
+): Promise<CandidateRecruitment> {
+  const result = await candidateRepository.acceptAgreement(candidateId, version)
 
   if (result.isFailure()) {
     throw new AppError(500, result.error)

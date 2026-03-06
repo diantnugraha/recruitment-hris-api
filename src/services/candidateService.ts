@@ -1,4 +1,5 @@
 import type { CandidateRecruitment } from '@prisma/client'
+import { randomBytes } from 'crypto'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
 import { sendCandidateInvitationEmail } from './emailService.js'
@@ -6,6 +7,11 @@ import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
+
+// Generate random 8-character password (alphanumeric)
+function generateRandomPassword(): string {
+  return randomBytes(4).toString('hex').toUpperCase()
+}
 import type {
   CandidateFilters,
   PaginationParams,
@@ -276,12 +282,14 @@ export async function sendCandidateInvitation(
     throw new NotFoundError('Candidate not found')
   }
 
-  // Generate token if not exists or get existing
-  const tokenResult = await candidateRepository.generateToken(candidateId)
-  if (tokenResult.isFailure()) {
-    throw new Error(tokenResult.error)
+  // Generate random 8-char password
+  const plainPassword = generateRandomPassword()
+
+  // Store password in candidate_recruitment_detail.candidate_token
+  const setPasswordResult = await candidateDetailRepository.setPassword(candidateId, plainPassword)
+  if (setPasswordResult.isFailure()) {
+    throw new Error(setPasswordResult.error)
   }
-  const token = tokenResult.getValue()
 
   // Get job title and department info
   const jobTitleName = candidate.jobTitle?.name || 'Position'
@@ -289,15 +297,15 @@ export async function sendCandidateInvitation(
     ? `Request: ${candidate.employeeRequest.code}`
     : 'Department'
 
-  // Construct portal URL
-  const portalUrl = `${portalBaseUrl}/candidate/login?email=${encodeURIComponent(candidate.email)}&token=${token}`
+  // Construct portal URL (login page, no token in URL)
+  const portalUrl = `${portalBaseUrl}/login`
 
   // Parse fullname into first and last name
   const nameParts = candidate.fullname.split(' ')
   const firstName = nameParts[0] || candidate.fullname
   const lastName = nameParts.slice(1).join(' ') || ''
 
-  // Send email via Mailgun
+  // Send email via Mailgun with credentials
   await sendCandidateInvitationEmail({
     email: candidate.email,
     firstName,
@@ -305,6 +313,7 @@ export async function sendCandidateInvitation(
     jobTitle: jobTitleName,
     department: departmentName,
     portalUrl,
+    password: plainPassword,
   })
 
   return {

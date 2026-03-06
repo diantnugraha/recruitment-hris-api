@@ -7,7 +7,7 @@ import type { CandidateLoginBody, CandidateProfileUpdate } from '../schemas/cand
 import { UnauthorizedError } from '../errors/index.js'
 
 // Transform candidate data for API response (snake_case)
-function transformCandidate(candidate: CandidateRecruitment) {
+function transformCandidate(candidate: CandidateRecruitment & { candidateCode?: string }) {
   return {
     id: Number(candidate.id),
     fullname: candidate.fullname,
@@ -27,8 +27,11 @@ function transformCandidate(candidate: CandidateRecruitment) {
     mobile_phone: candidate.mobile_phone,
     driving_license: candidate.driving_license,
     verify: candidate.verify,
+    agreement_accepted_at: candidate.agreementAcceptedAt?.toISOString() || null,
+    agreement_version: candidate.agreementVersion || null,
     created_at: candidate.createdAt?.toISOString() || null,
-    updated_at: candidate.updatedAt?.toISOString() || null
+    updated_at: candidate.updatedAt?.toISOString() || null,
+    candidate_code: candidate.candidateCode || null
   }
 }
 
@@ -46,12 +49,12 @@ export async function login(
   )
 }
 
-export async function verifyToken(
-  request: FastifyRequest<{ Body: { email: string; token: string } }>,
+export async function verifyPassword(
+  request: FastifyRequest<{ Body: { email: string; password: string } }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { email, token } = request.body
-  const isValid = await candidateAuthService.verifyToken(email, token)
+  const { email, password } = request.body
+  const isValid = await candidateAuthService.verifyPassword(email, password)
 
   return reply.status(200).send(
     successResponse({ valid: isValid })
@@ -88,5 +91,23 @@ export async function updateProfile(
 
   return reply.status(200).send(
     successResponse(transformCandidate(candidate))
+  )
+}
+
+export async function acceptAgreement(
+  request: FastifyRequest<{ Body: { version?: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.candidate) {
+    throw new UnauthorizedError('Not authenticated')
+  }
+
+  const candidate = await candidateAuthService.acceptAgreement(
+    request.candidate.candidateId,
+    request.body.version
+  )
+
+  return reply.status(200).send(
+    successResponse(transformCandidate({ ...candidate, candidateCode: undefined }))
   )
 }

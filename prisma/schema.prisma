@@ -319,6 +319,8 @@ model CandidateRecruitment {
   driving_license String         @db.VarChar(32)
   document_1     String          @db.Text
   document_2     String          @db.Text
+  agreementAcceptedAt DateTime?  @map("agreement_accepted_at") @db.Timestamp(0)
+  agreementVersion    String?    @map("agreement_version") @db.VarChar(20)
   createdAt      DateTime?       @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime?       @updatedAt @map("updated_at") @db.Timestamp(0)
 

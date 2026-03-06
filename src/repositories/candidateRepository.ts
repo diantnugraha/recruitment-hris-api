@@ -466,3 +466,22 @@ export async function countAll(): Promise<RepositoryResult<number>> {
     return failure(message)
   }
 }
+
+export async function acceptAgreement(
+  id: number,
+  version?: string
+): Promise<RepositoryResult<CandidateRecruitment>> {
+  try {
+    const candidate = await prisma.candidateRecruitment.update({
+      where: { id: BigInt(id) },
+      data: {
+        agreementAcceptedAt: new Date(),
+        agreementVersion: version || '1.0'
+      }
+    })
+    return success(candidate)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to accept agreement'
+    return failure(message)
+  }
+}

@@ -15,6 +15,7 @@ export type CandidateInvitationEmailData = {
   jobTitle: string
   department: string
   portalUrl: string
+  password: string
 }
 
 // --- Mailgun Client ---
@@ -100,6 +101,26 @@ function getCandidateInvitationTemplate(data: CandidateInvitationEmailData & { c
                 </tr>
               </table>
 
+              <!-- Login Credentials Card -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #fef3c7; border-radius: 8px; border: 1px solid #fbbf24;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px 0; color: #92400e; font-size: 14px; font-weight: 600;">
+                      Your Login Credentials
+                    </p>
+                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
+                      <strong>Email:</strong> ${data.email}
+                    </p>
+                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
+                      <strong>Password:</strong> <code style="background-color: #ffffff; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">${data.password}</code>
+                    </p>
+                    <p style="margin: 12px 0 0 0; color: #92400e; font-size: 12px;">
+                      Please keep your credentials secure and do not share them with anyone.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
               <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
                 Please click the button below to access our Candidate Portal and complete your application profile.
               </p>
@@ -126,7 +147,7 @@ function getCandidateInvitationTemplate(data: CandidateInvitationEmailData & { c
               <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
               <p style="margin: 0; color: #9ca3af; font-size: 14px;">
-                This invitation link is unique to you. Please do not share it with others.
+                If you have any questions, please contact our HR department.
               </p>
             </td>
           </tr>

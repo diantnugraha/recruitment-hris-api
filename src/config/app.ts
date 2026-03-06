@@ -23,7 +23,12 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // CORS must be registered before helmet
   await app.register(cors, {
-    origin: ['http://localhost:8080', 'http://127.0.0.1:8080'],
+    origin: [
+      'http://localhost:8080',
+      'http://127.0.0.1:8080',
+      'http://localhost:3001',  // Main HRIS frontend
+      'http://localhost:3002',  // Candidate portal
+    ],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true
   })

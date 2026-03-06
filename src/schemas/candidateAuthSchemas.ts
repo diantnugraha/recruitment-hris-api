@@ -2,7 +2,7 @@ import { Type, type Static } from '@sinclair/typebox'
 
 export const CandidateLoginBodySchema = Type.Object({
   email: Type.String({ format: 'email' }),
-  token: Type.String({ minLength: 1 })
+  password: Type.String({ minLength: 1 })
 })
 
 export type CandidateLoginBody = Static<typeof CandidateLoginBodySchema>
@@ -44,6 +44,8 @@ export const CandidateResponseSchema = Type.Object({
   mobile_phone: Type.String(),
   driving_license: Type.String(),
   verify: Type.String(),
+  agreement_accepted_at: Type.Union([Type.String(), Type.Null()]),
+  agreement_version: Type.Union([Type.String(), Type.Null()]),
   created_at: Type.Union([Type.String(), Type.Null()]),
   updated_at: Type.Union([Type.String(), Type.Null()])
 })
