@@ -23,8 +23,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.967.0",
+    "@aws-sdk/s3-request-presigner": "^3.967.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
+    "@fastify/multipart": "^9.4.0",
     "@prisma/client": "^5.22.0",
     "@sinclair/typebox": "^0.34.33",
     "bcryptjs": "^3.0.2",

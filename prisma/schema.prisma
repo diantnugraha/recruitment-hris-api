@@ -383,8 +383,62 @@ model candidate_recruitment_assessment {
   updatedAt                     DateTime?        @updatedAt @map("updated_at") @db.Timestamp(0)
   assessment_assigned_to        String           @db.VarChar(50)
   interview_started_at          DateTime?        @map("interview_started_at") @db.Timestamp(0)
+  mcu_document_url              String?          @map("mcu_document_url") @db.VarChar(500)
+  mcu_document_name             String?          @map("mcu_document_name") @db.VarChar(255)
+
+  scoring candidate_assessment_scoring[]
 
   @@map("candidate_recruitment_assessment")
+}
+
+enum InterviewStage {
+  INTERVIEW1 @map("interview1")
+  INTERVIEW2 @map("interview2")
+}
+
+enum AssessmentConclusion {
+  PROCEED     @map("proceed")
+  RECOMMENDED @map("recommended")
+  REJECTED    @map("rejected")
+}
+
+model candidate_assessment_scoring {
+  id                      BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  assessment_id           BigInt               @db.UnsignedBigInt
+  stage                   InterviewStage
+
+  // Scoring criteria (1-5 scale)
+  relevance_of_experience   Int                @db.TinyInt
+  training_undertaken       Int                @db.TinyInt
+  technical_skills          Int                @db.TinyInt
+  non_technical_skills      Int                @db.TinyInt
+  communication_skills      Int                @db.TinyInt
+  emotional_maturity        Int                @db.TinyInt
+  understanding_of_position Int                @db.TinyInt
+  teamwork_ability          Int                @db.TinyInt
+  total_score               Int                @db.TinyInt
+
+  // Conclusion
+  conclusion              AssessmentConclusion
+
+  // Rich text (Lexical JSON)
+  key_competencies        Json?                @db.Json
+  interviewer_notes       Json?                @db.Json
+
+  // Audit
+  assessed_by             String?              @db.VarChar(50)
+  assessed_at             DateTime?            @db.Timestamp(0)
+  createdAt               DateTime?            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt               DateTime?            @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  assessment candidate_recruitment_assessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+
+  @@unique([assessment_id, stage])
+  @@index([assessment_id])
+  @@index([stage])
+  @@index([conclusion])
+  @@index([total_score])
+  @@map("candidate_assessment_scoring")
 }
 
 model candidate_recruitment_onboarding {

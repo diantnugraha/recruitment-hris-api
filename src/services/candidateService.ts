@@ -22,6 +22,63 @@ import type { OnboardingWithRelations } from '../repositories/onboardingReposito
 
 // ==================== Type Definitions ====================
 
+export type ScoringInput = {
+  relevanceOfExperience: number
+  trainingUndertaken: number
+  technicalSkills: number
+  nonTechnicalSkills: number
+  communicationSkills: number
+  emotionalMaturity: number
+  understandingOfPosition: number
+  teamworkAbility: number
+}
+
+export type InterviewScoringPayload = {
+  scoring: ScoringInput
+  conclusion: 'PROCEED' | 'RECOMMENDED' | 'REJECTED'
+  keyCompetencies?: string | null | undefined
+  interviewerNotes?: string | null | undefined
+  assessedBy?: string | null | undefined
+}
+
+const SCORE_LABELS: Record<number, string> = {
+  1: 'Very Poor', 2: 'Poor', 3: 'Average', 4: 'Good', 5: 'Excellent'
+}
+
+function formatScoringDescription(payload: InterviewScoringPayload): string {
+  const { scoring, conclusion } = payload
+  const entries = [
+    ['Relevance of Experience', scoring.relevanceOfExperience],
+    ['Training Undertaken', scoring.trainingUndertaken],
+    ['Technical Skills', scoring.technicalSkills],
+    ['Non-Technical Skills', scoring.nonTechnicalSkills],
+    ['Communication Skills', scoring.communicationSkills],
+    ['Emotional Maturity', scoring.emotionalMaturity],
+    ['Understanding of Position', scoring.understandingOfPosition],
+    ['Teamwork Ability', scoring.teamworkAbility],
+  ] as const
+
+  const total = entries.reduce((sum, [, v]) => sum + v, 0)
+  const lines = entries.map(([label, val]) => `${label}: ${val}/5 (${SCORE_LABELS[val] ?? val})`)
+  lines.push(`\nTotal Score: ${total}/40`)
+  lines.push(`Conclusion: ${conclusion}`)
+
+  return lines.join('\n')
+}
+
+function computeTotalScore(scoring: ScoringInput): number {
+  return (
+    scoring.relevanceOfExperience +
+    scoring.trainingUndertaken +
+    scoring.technicalSkills +
+    scoring.nonTechnicalSkills +
+    scoring.communicationSkills +
+    scoring.emotionalMaturity +
+    scoring.understandingOfPosition +
+    scoring.teamworkAbility
+  )
+}
+
 export type CreateCandidateServiceData = {
   fullname: string
   email: string
@@ -432,7 +489,8 @@ export async function startAssessment(candidateId: number): Promise<AssessmentPr
 export async function updateInterview1(
   candidateId: number,
   status: AssessmentStatus,
-  description: string
+  description: string,
+  scoringPayload?: InterviewScoringPayload
 ): Promise<AssessmentProgress> {
   const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
 
@@ -445,14 +503,35 @@ export async function updateInterview1(
     throw new NotFoundError('Assessment not found for this candidate')
   }
 
+  // Dual-write: use formatted scoring as description if scoring provided
+  const desc = scoringPayload ? formatScoringDescription(scoringPayload) : description
+
   const updateResult = await candidateAssessmentRepository.updateInterview1(
     Number(assessment.id),
     status,
-    description
+    desc
   )
 
   if (updateResult.isFailure()) {
     throw new Error(updateResult.error)
+  }
+
+  // Write structured scoring to new table
+  if (scoringPayload) {
+    const scoringResult = await candidateAssessmentRepository.upsertScoring({
+      assessmentId: assessment.id,
+      stage: 'INTERVIEW1',
+      ...scoringPayload.scoring,
+      totalScore: computeTotalScore(scoringPayload.scoring),
+      conclusion: scoringPayload.conclusion,
+      keyCompetencies: scoringPayload.keyCompetencies ?? null,
+      interviewerNotes: scoringPayload.interviewerNotes ?? null,
+      assessedBy: scoringPayload.assessedBy ?? null,
+    })
+
+    if (scoringResult.isFailure()) {
+      throw new Error(scoringResult.error)
+    }
   }
 
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
@@ -466,7 +545,8 @@ export async function updateInterview1(
 export async function updateInterview2(
   candidateId: number,
   status: AssessmentStatus,
-  description: string
+  description: string,
+  scoringPayload?: InterviewScoringPayload
 ): Promise<AssessmentProgress> {
   const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
 
@@ -484,14 +564,35 @@ export async function updateInterview2(
     throw new BadRequestError('Cannot update Interview 2 before Interview 1 is passed')
   }
 
+  // Dual-write: use formatted scoring as description if scoring provided
+  const desc = scoringPayload ? formatScoringDescription(scoringPayload) : description
+
   const updateResult = await candidateAssessmentRepository.updateInterview2(
     Number(assessment.id),
     status,
-    description
+    desc
   )
 
   if (updateResult.isFailure()) {
     throw new Error(updateResult.error)
+  }
+
+  // Write structured scoring to new table
+  if (scoringPayload) {
+    const scoringResult = await candidateAssessmentRepository.upsertScoring({
+      assessmentId: assessment.id,
+      stage: 'INTERVIEW2',
+      ...scoringPayload.scoring,
+      totalScore: computeTotalScore(scoringPayload.scoring),
+      conclusion: scoringPayload.conclusion,
+      keyCompetencies: scoringPayload.keyCompetencies ?? null,
+      interviewerNotes: scoringPayload.interviewerNotes ?? null,
+      assessedBy: scoringPayload.assessedBy ?? null,
+    })
+
+    if (scoringResult.isFailure()) {
+      throw new Error(scoringResult.error)
+    }
   }
 
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
@@ -505,7 +606,9 @@ export async function updateInterview2(
 export async function updateMcu(
   candidateId: number,
   status: AssessmentStatus,
-  description: string
+  description: string,
+  documentUrl?: string | null,
+  documentName?: string | null
 ): Promise<AssessmentProgress> {
   const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
 
@@ -526,7 +629,9 @@ export async function updateMcu(
   const updateResult = await candidateAssessmentRepository.updateMcu(
     Number(assessment.id),
     status,
-    description
+    description,
+    documentUrl,
+    documentName
   )
 
   if (updateResult.isFailure()) {
@@ -539,6 +644,141 @@ export async function updateMcu(
   }
 
   return progressResult.getValue()!
+}
+
+export async function uploadMcuDocument(
+  candidateId: number,
+  fileBuffer: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<{ url: string; name: string }> {
+  const { uploadToS3 } = await import('../config/s3.js')
+
+  const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
+
+  if (assessmentResult.isFailure()) {
+    throw new Error(assessmentResult.error)
+  }
+
+  const assessment = assessmentResult.getValue()
+  if (!assessment) {
+    throw new NotFoundError('Assessment not found for this candidate')
+  }
+
+  // Upload to S3
+  const timestamp = Date.now()
+  const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const s3Key = `mcu-documents/${candidateId}/${timestamp}_${sanitizedName}`
+
+  const url = await uploadToS3(s3Key, fileBuffer, contentType)
+
+  // Save document reference in database
+  const updateResult = await candidateAssessmentRepository.updateMcuDocument(
+    Number(assessment.id),
+    url,
+    fileName
+  )
+
+  if (updateResult.isFailure()) {
+    throw new Error(updateResult.error)
+  }
+
+  return { url, name: fileName }
+}
+
+export async function getMcuDocument(
+  candidateId: number
+): Promise<{ url: string | null; name: string | null; presignedUrl: string | null }> {
+  const result = await candidateAssessmentRepository.getMcuDocument(candidateId)
+
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+
+  const doc = result.getValue()
+  if (!doc || !doc.url) {
+    return { url: null, name: null, presignedUrl: null }
+  }
+
+  // Generate presigned URL for secure access
+  const { getPresignedUrl } = await import('../config/s3.js')
+
+  // Extract S3 key from full URL
+  const urlObj = new URL(doc.url)
+  const s3Key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname
+
+  const presignedUrl = await getPresignedUrl(s3Key)
+
+  return { url: doc.url, name: doc.name, presignedUrl }
+}
+
+export async function deleteMcuDocument(candidateId: number): Promise<void> {
+  const docResult = await candidateAssessmentRepository.getMcuDocument(candidateId)
+
+  if (docResult.isFailure()) {
+    throw new Error(docResult.error)
+  }
+
+  const doc = docResult.getValue()
+  if (!doc || !doc.url) {
+    throw new NotFoundError('No MCU document found for this candidate')
+  }
+
+  // Delete from S3
+  const { deleteFromS3 } = await import('../config/s3.js')
+  const urlObj = new URL(doc.url)
+  const s3Key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname
+  await deleteFromS3(s3Key)
+
+  // Clear reference in database
+  const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
+  if (assessmentResult.isFailure()) {
+    throw new Error(assessmentResult.error)
+  }
+
+  const assessment = assessmentResult.getValue()
+  if (assessment) {
+    await candidateAssessmentRepository.updateMcuDocument(
+      Number(assessment.id),
+      '',
+      ''
+    )
+  }
+}
+
+// ==================== Assessment Scoring Services ====================
+
+export async function getAssessmentScoring(
+  candidateId: number,
+  stage?: 'INTERVIEW1' | 'INTERVIEW2'
+) {
+  const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
+
+  if (assessmentResult.isFailure()) {
+    throw new Error(assessmentResult.error)
+  }
+
+  const assessment = assessmentResult.getValue()
+  if (!assessment) {
+    throw new NotFoundError('Assessment not found for this candidate')
+  }
+
+  if (stage) {
+    const result = await candidateAssessmentRepository.findScoringByAssessmentAndStage(
+      assessment.id,
+      stage
+    )
+    if (result.isFailure()) {
+      throw new Error(result.error)
+    }
+    return result.getValue()
+  }
+
+  const result = await candidateAssessmentRepository.findScoringByAssessmentId(assessment.id)
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+  return result.getValue()
 }
 
 // ==================== Onboarding Services ====================

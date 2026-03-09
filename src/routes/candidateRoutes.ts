@@ -34,6 +34,27 @@ type AssessmentUpdateBody = {
   description: string
 }
 
+type InterviewUpdateBody = AssessmentUpdateBody & {
+  scoring?: {
+    relevance_of_experience: number
+    training_undertaken: number
+    technical_skills: number
+    non_technical_skills: number
+    communication_skills: number
+    emotional_maturity: number
+    understanding_of_position: number
+    teamwork_ability: number
+  }
+  conclusion?: 'PROCEED' | 'RECOMMENDED' | 'REJECTED'
+  key_competencies?: string | null
+  interviewer_notes?: string | null
+  assessed_by?: string | null
+}
+
+type ScoringQuery = {
+  stage?: 'interview1' | 'interview2'
+}
+
 type OnboardingBody = {
   job_placement?: string
   document?: string
@@ -137,18 +158,25 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     candidateController.startAssessment
   )
 
-  // Update Interview 1
-  app.put<{ Params: IdParam; Body: AssessmentUpdateBody }>(
+  // Update Interview HR
+  app.put<{ Params: IdParam; Body: InterviewUpdateBody }>(
     '/:id/assessment/interview1',
     { schema: { params: IdParamSchema } },
     candidateController.updateInterview1
   )
 
-  // Update Interview 2
-  app.put<{ Params: IdParam; Body: AssessmentUpdateBody }>(
+  // Update Interview User
+  app.put<{ Params: IdParam; Body: InterviewUpdateBody }>(
     '/:id/assessment/interview2',
     { schema: { params: IdParamSchema } },
     candidateController.updateInterview2
+  )
+
+  // Get assessment scoring data
+  app.get<{ Params: IdParam; Querystring: ScoringQuery }>(
+    '/:id/assessment/scoring',
+    { schema: { params: IdParamSchema } },
+    candidateController.getAssessmentScoring
   )
 
   // Update MCU
@@ -156,6 +184,27 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     '/:id/assessment/mcu',
     { schema: { params: IdParamSchema } },
     candidateController.updateMcu
+  )
+
+  // MCU Document Upload
+  app.post<{ Params: IdParam }>(
+    '/:id/assessment/mcu/document',
+    { schema: { params: IdParamSchema } },
+    candidateController.uploadMcuDocument
+  )
+
+  // Get MCU Document (with presigned URL)
+  app.get<{ Params: IdParam }>(
+    '/:id/assessment/mcu/document',
+    { schema: { params: IdParamSchema } },
+    candidateController.getMcuDocument
+  )
+
+  // Delete MCU Document
+  app.delete<{ Params: IdParam }>(
+    '/:id/assessment/mcu/document',
+    { schema: { params: IdParamSchema } },
+    candidateController.deleteMcuDocument
   )
 
   // ==================== Onboarding ====================

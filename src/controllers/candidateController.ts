@@ -46,6 +46,27 @@ type AssessmentUpdateBody = {
   description: string
 }
 
+type InterviewUpdateBody = AssessmentUpdateBody & {
+  scoring?: {
+    relevance_of_experience: number
+    training_undertaken: number
+    technical_skills: number
+    non_technical_skills: number
+    communication_skills: number
+    emotional_maturity: number
+    understanding_of_position: number
+    teamwork_ability: number
+  }
+  conclusion?: 'PROCEED' | 'RECOMMENDED' | 'REJECTED'
+  key_competencies?: string | null
+  interviewer_notes?: string | null
+  assessed_by?: string | null
+}
+
+type ScoringQuery = {
+  stage?: 'interview1' | 'interview2'
+}
+
 type OnboardingBody = {
   job_placement?: string
   document?: string
@@ -319,39 +340,181 @@ export async function startAssessment(
 }
 
 export async function updateInterview1(
-  request: FastifyRequest<{ Params: IdParam; Body: AssessmentUpdateBody }>,
+  request: FastifyRequest<{ Params: IdParam; Body: InterviewUpdateBody }>,
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { status, description } = request.body
+  const { status, description, scoring, conclusion, key_competencies, interviewer_notes, assessed_by } = request.body
 
-  const progress = await candidateService.updateInterview1(id, status as AssessmentStatus, description)
+  const scoringPayload = scoring && conclusion ? {
+    scoring: {
+      relevanceOfExperience: scoring.relevance_of_experience,
+      trainingUndertaken: scoring.training_undertaken,
+      technicalSkills: scoring.technical_skills,
+      nonTechnicalSkills: scoring.non_technical_skills,
+      communicationSkills: scoring.communication_skills,
+      emotionalMaturity: scoring.emotional_maturity,
+      understandingOfPosition: scoring.understanding_of_position,
+      teamworkAbility: scoring.teamwork_ability,
+    },
+    conclusion,
+    keyCompetencies: key_competencies,
+    interviewerNotes: interviewer_notes,
+    assessedBy: assessed_by,
+  } : undefined
 
-  sendSuccess(reply, progress, 'Interview 1 updated successfully')
+  const progress = await candidateService.updateInterview1(id, status as AssessmentStatus, description, scoringPayload)
+
+  sendSuccess(reply, progress, 'Interview HR updated successfully')
 }
 
 export async function updateInterview2(
-  request: FastifyRequest<{ Params: IdParam; Body: AssessmentUpdateBody }>,
+  request: FastifyRequest<{ Params: IdParam; Body: InterviewUpdateBody }>,
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { status, description } = request.body
+  const { status, description, scoring, conclusion, key_competencies, interviewer_notes, assessed_by } = request.body
 
-  const progress = await candidateService.updateInterview2(id, status as AssessmentStatus, description)
+  const scoringPayload = scoring && conclusion ? {
+    scoring: {
+      relevanceOfExperience: scoring.relevance_of_experience,
+      trainingUndertaken: scoring.training_undertaken,
+      technicalSkills: scoring.technical_skills,
+      nonTechnicalSkills: scoring.non_technical_skills,
+      communicationSkills: scoring.communication_skills,
+      emotionalMaturity: scoring.emotional_maturity,
+      understandingOfPosition: scoring.understanding_of_position,
+      teamworkAbility: scoring.teamwork_ability,
+    },
+    conclusion,
+    keyCompetencies: key_competencies,
+    interviewerNotes: interviewer_notes,
+    assessedBy: assessed_by,
+  } : undefined
 
-  sendSuccess(reply, progress, 'Interview 2 updated successfully')
+  const progress = await candidateService.updateInterview2(id, status as AssessmentStatus, description, scoringPayload)
+
+  sendSuccess(reply, progress, 'Interview User updated successfully')
+}
+
+type McuUpdateBody = AssessmentUpdateBody & {
+  document_url?: string | null
+  document_name?: string | null
 }
 
 export async function updateMcu(
-  request: FastifyRequest<{ Params: IdParam; Body: AssessmentUpdateBody }>,
+  request: FastifyRequest<{ Params: IdParam; Body: McuUpdateBody }>,
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { status, description } = request.body
+  const { status, description, document_url, document_name } = request.body
 
-  const progress = await candidateService.updateMcu(id, status as AssessmentStatus, description)
+  const progress = await candidateService.updateMcu(
+    id,
+    status as AssessmentStatus,
+    description,
+    document_url,
+    document_name
+  )
 
   sendSuccess(reply, progress, 'MCU updated successfully')
+}
+
+const ALLOWED_MCU_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/jpg',
+]
+const MAX_MCU_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+export async function uploadMcuDocument(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const file = await request.file()
+  if (!file) {
+    reply.status(400).send({ success: false, message: 'No file uploaded' })
+    return
+  }
+
+  // Validate file type
+  if (!ALLOWED_MCU_TYPES.includes(file.mimetype)) {
+    reply.status(400).send({
+      success: false,
+      message: `Invalid file type. Allowed: PDF, JPEG, PNG`
+    })
+    return
+  }
+
+  // Read file buffer
+  const chunks: Buffer[] = []
+  for await (const chunk of file.file) {
+    chunks.push(chunk)
+  }
+  const buffer = Buffer.concat(chunks)
+
+  // Validate file size
+  if (buffer.length > MAX_MCU_FILE_SIZE) {
+    reply.status(400).send({
+      success: false,
+      message: `File too large. Maximum size: 10MB`
+    })
+    return
+  }
+
+  const result = await candidateService.uploadMcuDocument(
+    id,
+    buffer,
+    file.filename,
+    file.mimetype
+  )
+
+  sendSuccess(reply, result, 'MCU document uploaded successfully')
+}
+
+export async function getMcuDocument(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const document = await candidateService.getMcuDocument(id)
+
+  sendSuccess(reply, document)
+}
+
+export async function deleteMcuDocument(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  await candidateService.deleteMcuDocument(id)
+
+  sendSuccess(reply, null, 'MCU document deleted successfully')
+}
+
+// ==================== Assessment Scoring Endpoints ====================
+
+export async function getAssessmentScoring(
+  request: FastifyRequest<{ Params: IdParam; Querystring: ScoringQuery }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+  const { stage } = request.query
+
+  const stageMap: Record<string, 'INTERVIEW1' | 'INTERVIEW2'> = {
+    interview1: 'INTERVIEW1',
+    interview2: 'INTERVIEW2',
+  }
+
+  const mappedStage = stage ? stageMap[stage] : undefined
+  const scoring = await candidateService.getAssessmentScoring(id, mappedStage)
+
+  sendSuccess(reply, scoring)
 }
 
 // ==================== Onboarding Endpoints ====================

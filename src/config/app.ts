@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
+import multipart from '@fastify/multipart'
 
 import { errorHandler } from '../middlewares/errorHandler.js'
 import { registerRoutes } from '../routes/index.js'
@@ -33,6 +34,14 @@ export async function createApp(): Promise<FastifyInstance> {
     credentials: true
   })
   await app.register(helmet)
+
+  // Multipart file upload support
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max
+      files: 1, // 1 file per request
+    },
+  })
 
   // Error handler
   app.setErrorHandler(errorHandler)

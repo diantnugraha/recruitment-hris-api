@@ -1,4 +1,5 @@
-import type { candidate_recruitment_assessment, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { candidate_recruitment_assessment, candidate_assessment_scoring } from '@prisma/client'
 
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
@@ -27,6 +28,8 @@ export type UpdateAssessmentData = {
   // MCU
   mcuStatus?: AssessmentStatus
   mcuDesc?: string
+  mcuDocumentUrl?: string | null
+  mcuDocumentName?: string | null
   // Additional fields
   reasonToMove?: string
   purposeOfApplying?: string
@@ -137,6 +140,11 @@ export async function update(
     if (data.mcuStatus !== undefined) updateData.mcu_status = data.mcuStatus
     if (data.mcuDesc !== undefined) updateData.mcu_desc = data.mcuDesc
 
+    // MCU document fields — cast needed until migration is applied and prisma generate is re-run
+    const extendedUpdate = updateData as Record<string, unknown>
+    if (data.mcuDocumentUrl !== undefined) extendedUpdate.mcu_document_url = data.mcuDocumentUrl
+    if (data.mcuDocumentName !== undefined) extendedUpdate.mcu_document_name = data.mcuDocumentName
+
     // Additional fields
     if (data.reasonToMove !== undefined) updateData.reason_to_move = data.reasonToMove
     if (data.purposeOfApplying !== undefined) updateData.purpose_of_applying = data.purposeOfApplying
@@ -194,12 +202,53 @@ export async function updateInterview2(
 export async function updateMcu(
   id: number,
   status: AssessmentStatus,
-  description: string
+  description: string,
+  documentUrl?: string | null,
+  documentName?: string | null
 ): Promise<RepositoryResult<candidate_recruitment_assessment>> {
   return update(id, {
     mcuStatus: status,
-    mcuDesc: description
+    mcuDesc: description,
+    ...(documentUrl !== undefined && { mcuDocumentUrl: documentUrl }),
+    ...(documentName !== undefined && { mcuDocumentName: documentName }),
   })
+}
+
+// Update MCU document only (without changing status)
+export async function updateMcuDocument(
+  id: number,
+  documentUrl: string,
+  documentName: string
+): Promise<RepositoryResult<candidate_recruitment_assessment>> {
+  return update(id, {
+    mcuDocumentUrl: documentUrl,
+    mcuDocumentName: documentName,
+  })
+}
+
+// Get MCU document info
+export async function getMcuDocument(
+  candidateId: number
+): Promise<RepositoryResult<{ url: string | null; name: string | null } | null>> {
+  try {
+    const assessment = await prisma.candidate_recruitment_assessment.findFirst({
+      where: { candidate_id: candidateId }
+    })
+
+    if (!assessment) {
+      return success(null)
+    }
+
+    const record = assessment as unknown as Record<string, unknown>
+
+    return success({
+      url: (record.mcu_document_url as string) ?? null,
+      name: (record.mcu_document_name as string) ?? null,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get MCU document'
+    return failure(message)
+  }
 }
 
 // Start interview - sets interview_started_at to current timestamp
@@ -311,6 +360,143 @@ export type AssessmentProgress = {
   interviewStarted: boolean
   interviewStartedAt: string | null
 }
+
+// ==================== Scoring CRUD ====================
+
+export type CreateScoringData = {
+  assessmentId: bigint
+  stage: 'INTERVIEW1' | 'INTERVIEW2'
+  relevanceOfExperience: number
+  trainingUndertaken: number
+  technicalSkills: number
+  nonTechnicalSkills: number
+  communicationSkills: number
+  emotionalMaturity: number
+  understandingOfPosition: number
+  teamworkAbility: number
+  totalScore: number
+  conclusion: 'PROCEED' | 'RECOMMENDED' | 'REJECTED'
+  keyCompetencies?: string | null
+  interviewerNotes?: string | null
+  assessedBy?: string | null
+}
+
+export async function createScoring(data: CreateScoringData): Promise<RepositoryResult<candidate_assessment_scoring>> {
+  try {
+    const scoring = await prisma.candidate_assessment_scoring.create({
+      data: {
+        assessment_id: data.assessmentId,
+        stage: data.stage,
+        relevance_of_experience: data.relevanceOfExperience,
+        training_undertaken: data.trainingUndertaken,
+        technical_skills: data.technicalSkills,
+        non_technical_skills: data.nonTechnicalSkills,
+        communication_skills: data.communicationSkills,
+        emotional_maturity: data.emotionalMaturity,
+        understanding_of_position: data.understandingOfPosition,
+        teamwork_ability: data.teamworkAbility,
+        total_score: data.totalScore,
+        conclusion: data.conclusion,
+        key_competencies: data.keyCompetencies ?? Prisma.DbNull,
+        interviewer_notes: data.interviewerNotes ?? Prisma.DbNull,
+        assessed_by: data.assessedBy ?? null,
+        assessed_at: new Date(),
+      }
+    })
+    return success(scoring)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create scoring'
+    return failure(message)
+  }
+}
+
+export async function findScoringByAssessmentAndStage(
+  assessmentId: bigint,
+  stage: 'INTERVIEW1' | 'INTERVIEW2'
+): Promise<RepositoryResult<candidate_assessment_scoring | null>> {
+  try {
+    const scoring = await prisma.candidate_assessment_scoring.findUnique({
+      where: {
+        assessment_id_stage: {
+          assessment_id: assessmentId,
+          stage,
+        }
+      }
+    })
+    return success(scoring)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to find scoring'
+    return failure(message)
+  }
+}
+
+export async function findScoringByAssessmentId(
+  assessmentId: bigint
+): Promise<RepositoryResult<candidate_assessment_scoring[]>> {
+  try {
+    const scorings = await prisma.candidate_assessment_scoring.findMany({
+      where: { assessment_id: assessmentId },
+      orderBy: { stage: 'asc' }
+    })
+    return success(scorings)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to find scorings'
+    return failure(message)
+  }
+}
+
+export async function upsertScoring(data: CreateScoringData): Promise<RepositoryResult<candidate_assessment_scoring>> {
+  try {
+    const scoring = await prisma.candidate_assessment_scoring.upsert({
+      where: {
+        assessment_id_stage: {
+          assessment_id: data.assessmentId,
+          stage: data.stage,
+        }
+      },
+      create: {
+        assessment_id: data.assessmentId,
+        stage: data.stage,
+        relevance_of_experience: data.relevanceOfExperience,
+        training_undertaken: data.trainingUndertaken,
+        technical_skills: data.technicalSkills,
+        non_technical_skills: data.nonTechnicalSkills,
+        communication_skills: data.communicationSkills,
+        emotional_maturity: data.emotionalMaturity,
+        understanding_of_position: data.understandingOfPosition,
+        teamwork_ability: data.teamworkAbility,
+        total_score: data.totalScore,
+        conclusion: data.conclusion,
+        key_competencies: data.keyCompetencies ?? Prisma.DbNull,
+        interviewer_notes: data.interviewerNotes ?? Prisma.DbNull,
+        assessed_by: data.assessedBy ?? null,
+        assessed_at: new Date(),
+      },
+      update: {
+        relevance_of_experience: data.relevanceOfExperience,
+        training_undertaken: data.trainingUndertaken,
+        technical_skills: data.technicalSkills,
+        non_technical_skills: data.nonTechnicalSkills,
+        communication_skills: data.communicationSkills,
+        emotional_maturity: data.emotionalMaturity,
+        understanding_of_position: data.understandingOfPosition,
+        teamwork_ability: data.teamworkAbility,
+        total_score: data.totalScore,
+        conclusion: data.conclusion,
+        key_competencies: data.keyCompetencies ?? Prisma.DbNull,
+        interviewer_notes: data.interviewerNotes ?? Prisma.DbNull,
+        assessed_by: data.assessedBy ?? null,
+        assessed_at: new Date(),
+      }
+    })
+    return success(scoring)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to upsert scoring'
+    return failure(message)
+  }
+}
+
+// ==================== Assessment Progress ====================
 
 export async function getProgress(candidateId: number): Promise<RepositoryResult<AssessmentProgress | null>> {
   try {
