@@ -76,6 +76,13 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     candidateController.getById
   )
 
+  // Get candidate biodata (education, work experience, family, training, self assessment)
+  app.get<{ Params: IdParam }>(
+    '/:id/biodata',
+    { schema: { params: IdParamSchema } },
+    candidateController.getBiodata
+  )
+
   // Create new candidate
   app.post('/', candidateController.create)
 
@@ -121,6 +128,13 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     '/:id/assessment',
     { schema: { params: IdParamSchema } },
     candidateController.getAssessmentProgress
+  )
+
+  // Start assessment (unlock interview process)
+  app.post<{ Params: IdParam }>(
+    '/:id/assessment/start',
+    { schema: { params: IdParamSchema } },
+    candidateController.startAssessment
   )
 
   // Update Interview 1

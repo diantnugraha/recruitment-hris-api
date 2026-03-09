@@ -12,6 +12,7 @@ import { employeeRoutes } from './employeeRoutes.js'
 import { employeeBudgetRoutes } from './employeeBudgetRoutes.js'
 import { candidateRoutes } from './candidateRoutes.js'
 import { candidateAuthRoutes } from './candidateAuthRoutes.js'
+import { candidateProfileRoutes } from './candidateProfileRoutes.js'
 import { employeeRequestRoutes } from './employeeRequestRoutes.js'
 import { roleRoutes } from './roleRoutes.js'
 
@@ -28,6 +29,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(employeeBudgetRoutes, { prefix: '/v1/employee-budget' })
   await app.register(candidateRoutes, { prefix: '/v1/candidate' })
   await app.register(candidateAuthRoutes, { prefix: '/v1/candidate-auth' })
+  await app.register(candidateProfileRoutes, { prefix: '/v1/candidate-profile' })
   await app.register(employeeRequestRoutes, { prefix: '/v1/employee-request' })
   await app.register(roleRoutes, { prefix: '/v1/role' })
 }

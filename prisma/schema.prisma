@@ -382,6 +382,7 @@ model candidate_recruitment_assessment {
   createdAt                     DateTime?        @map("created_at") @db.Timestamp(0)
   updatedAt                     DateTime?        @updatedAt @map("updated_at") @db.Timestamp(0)
   assessment_assigned_to        String           @db.VarChar(50)
+  interview_started_at          DateTime?        @map("interview_started_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_assessment")
 }

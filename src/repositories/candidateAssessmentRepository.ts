@@ -202,6 +202,34 @@ export async function updateMcu(
   })
 }
 
+// Start interview - sets interview_started_at to current timestamp
+export async function startInterview(candidateId: number): Promise<RepositoryResult<candidate_recruitment_assessment>> {
+  try {
+    const assessment = await prisma.candidate_recruitment_assessment.findFirst({
+      where: { candidate_id: candidateId }
+    })
+
+    if (!assessment) {
+      return failure('Assessment not found for this candidate')
+    }
+
+    // Check if already started
+    if (assessment.interview_started_at !== null) {
+      return success(assessment) // Already started, return current state
+    }
+
+    const updated = await prisma.candidate_recruitment_assessment.update({
+      where: { id: assessment.id },
+      data: { interview_started_at: new Date() }
+    })
+
+    return success(updated)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to start interview'
+    return failure(message)
+  }
+}
+
 export async function remove(id: number): Promise<RepositoryResult<boolean>> {
   try {
     await prisma.candidate_recruitment_assessment.delete({
@@ -274,12 +302,14 @@ export async function hasFailedAnyAssessment(candidateId: number): Promise<Repos
 
 // Get assessment progress (how many stages completed)
 export type AssessmentProgress = {
-  interview1: { status: string; passed: boolean; failed: boolean; pending: boolean }
+  interview1: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean }
   interview2: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean }
   mcu: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean }
   allPassed: boolean
   anyFailed: boolean
   currentStage: 'interview1' | 'interview2' | 'mcu' | 'completed' | 'failed'
+  interviewStarted: boolean
+  interviewStartedAt: string | null
 }
 
 export async function getProgress(candidateId: number): Promise<RepositoryResult<AssessmentProgress | null>> {
@@ -292,11 +322,15 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       return success(null)
     }
 
+    // Check if interview has been started (interview_started_at is set)
+    const interviewStarted = assessment.interview_started_at !== null
+
     const interview1 = {
       status: assessment.interview1_status,
       passed: assessment.interview1_status === 'PASSED',
       failed: assessment.interview1_status === 'FAILED',
-      pending: assessment.interview1_status === 'PENDING'
+      pending: assessment.interview1_status === 'PENDING',
+      locked: !interviewStarted // Interview 1 is locked until interview is started
     }
 
     const interview2 = {
@@ -335,7 +369,9 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       mcu,
       allPassed,
       anyFailed,
-      currentStage
+      currentStage,
+      interviewStarted,
+      interviewStartedAt: assessment.interview_started_at?.toISOString() || null
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get assessment progress'

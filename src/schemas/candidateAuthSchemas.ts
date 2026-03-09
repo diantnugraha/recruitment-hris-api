@@ -46,12 +46,16 @@ export const CandidateResponseSchema = Type.Object({
   marrital_status: Type.String(),
   gender: Type.String(),
   mobile_phone: Type.String(),
+  domicile_address: Type.String(),
   driving_license: Type.String(),
+  uniform_shirt_size: Type.String(),
+  uniform_pants_size: Type.String(),
   verify: Type.String(),
   agreement_accepted_at: Type.Union([Type.String(), Type.Null()]),
   agreement_version: Type.Union([Type.String(), Type.Null()]),
   created_at: Type.Union([Type.String(), Type.Null()]),
-  updated_at: Type.Union([Type.String(), Type.Null()])
+  updated_at: Type.Union([Type.String(), Type.Null()]),
+  candidate_code: Type.Union([Type.String(), Type.Null()])
 })
 
 export type CandidateResponse = Static<typeof CandidateResponseSchema>

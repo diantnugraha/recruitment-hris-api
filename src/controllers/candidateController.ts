@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
 import * as candidateService from '../services/candidateService.js'
+import * as candidateProfileRepository from '../repositories/candidateProfileRepository.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
 import type { CandidateWithDetail } from '../repositories/candidateRepository.js'
 import type { AssessmentStatus } from '../repositories/candidateAssessmentRepository.js'
@@ -306,6 +307,17 @@ export async function getAssessmentProgress(
   sendSuccess(reply, progress)
 }
 
+export async function startAssessment(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const progress = await candidateService.startAssessment(id)
+
+  sendSuccess(reply, progress, 'Assessment started successfully')
+}
+
 export async function updateInterview1(
   request: FastifyRequest<{ Params: IdParam; Body: AssessmentUpdateBody }>,
   reply: FastifyReply
@@ -563,4 +575,101 @@ export async function convertToEmployee(
   const result = await candidateService.convertToEmployee(id)
 
   sendSuccess(reply, result, 'Candidate converted to employee successfully')
+}
+
+// ==================== Biodata Endpoints ====================
+
+export async function getBiodata(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+  const candidateId = Number(id)
+
+  // Fetch all biodata in parallel
+  const [educationResult, workExperienceResult, familyResult, trainingResult, assessmentResult] = await Promise.all([
+    candidateProfileRepository.findEducationByCandidateId(candidateId),
+    candidateProfileRepository.findWorkExperienceByCandidateId(candidateId),
+    candidateProfileRepository.findFamilyByCandidateId(candidateId),
+    candidateProfileRepository.findTrainingByCandidateId(candidateId),
+    candidateProfileRepository.findAssessmentByCandidateId(candidateId)
+  ])
+
+  // Transform education data
+  const education = educationResult.isSuccess()
+    ? educationResult.getValue().map(item => ({
+        id: Number(item.id),
+        school_university: item.school_university,
+        city: item.city,
+        degree: item.degree,
+        major: item.major,
+        year_graduate: item.year_graduate
+      }))
+    : []
+
+  // Transform work experience data
+  const workExperience = workExperienceResult.isSuccess()
+    ? workExperienceResult.getValue().map(item => ({
+        id: Number(item.id),
+        company: item.company,
+        city: item.city,
+        job_title: item.job_title,
+        period: item.period,
+        length_of_working: item.length_of_working
+      }))
+    : []
+
+  // Transform family data
+  const family = familyResult.isSuccess()
+    ? familyResult.getValue().map(item => ({
+        id: Number(item.id),
+        name: item.name,
+        relation: item.relation,
+        age: item.age,
+        education: item.education,
+        work: item.work
+      }))
+    : []
+
+  // Transform training/course data
+  const training = trainingResult.isSuccess()
+    ? trainingResult.getValue().map(item => ({
+        id: Number(item.id),
+        course_topic: item.course_topic,
+        provider: item.provider,
+        year: item.year,
+        city: item.city,
+        certificate: item.certificate
+      }))
+    : []
+
+  // Transform self assessment data
+  const assessmentData = assessmentResult.isSuccess() ? assessmentResult.getValue() : null
+  const selfAssessment = assessmentData
+    ? {
+        id: Number(assessmentData.id),
+        reason_leaving_last_job: assessmentData.reason_to_move,
+        last_job_description: assessmentData.last_job_description,
+        reason_applying: assessmentData.purpose_of_applying,
+        relevant_skills: assessmentData.tasks_jobs,
+        last_salary: assessmentData.last_salary,
+        expected_salary: assessmentData.expected_salary,
+        active_language: assessmentData.active_language,
+        willing_to_transfer: assessmentData.rotate_work,
+        willing_to_double_work: assessmentData.loyality,
+        known_employees: assessmentData.employees_you_know,
+        ready_to_work: assessmentData.when_ready_work,
+        employee_relationship: assessmentData.relationship_with_the_employee,
+        reference_contact_name: assessmentData.ref_contact_name,
+        reference_contact_phone: assessmentData.ref_mobile_phone
+      }
+    : null
+
+  sendSuccess(reply, {
+    education,
+    work_experience: workExperience,
+    family,
+    training,
+    self_assessment: selfAssessment
+  })
 }

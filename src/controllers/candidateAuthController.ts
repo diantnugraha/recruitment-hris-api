@@ -73,9 +73,18 @@ export async function getProfile(
   }
 
   const candidate = await candidateAuthService.getProfile(request.candidate.candidateId)
+  const transformed = transformCandidate(candidate)
+
+  // Debug: Log transformed response
+  console.log('[DEBUG] getProfile - transformed response:', {
+    uniform_shirt_size: transformed.uniform_shirt_size,
+    uniform_pants_size: transformed.uniform_pants_size,
+    domicile_address: transformed.domicile_address,
+    driving_license: transformed.driving_license,
+  })
 
   return reply.status(200).send(
-    successResponse(transformCandidate(candidate))
+    successResponse(transformed)
   )
 }
 

@@ -381,10 +381,20 @@ export async function update(id: number, data: UpdateCandidateData): Promise<Rep
     if (data.uniformShirtSize !== undefined) updateData.uniform_shirt_size = data.uniformShirtSize
     if (data.uniformPantsSize !== undefined) updateData.uniform_pants_size = data.uniformPantsSize
 
+    // Debug: Log what we're sending to Prisma
+    console.log('[DEBUG] repository.update - updateData for Prisma:', JSON.stringify(updateData, (key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    , 2))
+
     const candidate = await prisma.candidateRecruitment.update({
       where: { id: BigInt(id) },
       data: updateData
     })
+
+    // Debug: Log the result
+    console.log('[DEBUG] repository.update - result uniform_shirt_size:', candidate.uniform_shirt_size)
+    console.log('[DEBUG] repository.update - result uniform_pants_size:', candidate.uniform_pants_size)
+    console.log('[DEBUG] repository.update - result domicile_address:', candidate.domicile_address)
 
     return success(candidate)
   } catch (error) {

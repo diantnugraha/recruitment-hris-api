@@ -386,6 +386,49 @@ export async function getAssessmentProgress(candidateId: number): Promise<Assess
   return result.getValue()
 }
 
+export async function startAssessment(candidateId: number): Promise<AssessmentProgress> {
+  // Check if candidate exists
+  const candidateResult = await candidateRepository.findById(candidateId)
+  if (candidateResult.isFailure()) {
+    throw new Error(candidateResult.error)
+  }
+
+  const candidate = candidateResult.getValue()
+  if (!candidate) {
+    throw new NotFoundError('Candidate not found')
+  }
+
+  // Check if candidate is verified
+  if (candidate.verify !== 'VERIFIED') {
+    throw new BadRequestError('Candidate must be verified before starting assessment')
+  }
+
+  // Check if assessment record exists
+  const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
+  if (assessmentResult.isFailure()) {
+    throw new Error(assessmentResult.error)
+  }
+
+  const assessment = assessmentResult.getValue()
+  if (!assessment) {
+    throw new NotFoundError('Assessment not found. Candidate must be linked to an employee request first.')
+  }
+
+  // Start the interview
+  const startResult = await candidateAssessmentRepository.startInterview(candidateId)
+  if (startResult.isFailure()) {
+    throw new Error(startResult.error)
+  }
+
+  // Return updated progress
+  const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
+  if (progressResult.isFailure()) {
+    throw new Error(progressResult.error)
+  }
+
+  return progressResult.getValue()!
+}
+
 export async function updateInterview1(
   candidateId: number,
   status: AssessmentStatus,

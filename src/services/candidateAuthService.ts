@@ -117,6 +117,14 @@ export async function getProfile(candidateId: number): Promise<CandidateRecruitm
     throw new NotFoundError('Candidate not found')
   }
 
+  // Debug: Log candidate data from repository
+  console.log('[DEBUG] getProfile - candidate from DB:', {
+    uniform_shirt_size: candidate.uniform_shirt_size,
+    uniform_pants_size: candidate.uniform_pants_size,
+    domicile_address: candidate.domicile_address,
+    driving_license: candidate.driving_license,
+  })
+
   // Get candidate code from detail
   const detailResult = await candidateDetailRepository.findByEmailWithDetail(candidate.email)
   let candidateCode: string | undefined
@@ -133,6 +141,12 @@ export async function updateProfile(
   candidateId: number,
   data: CandidateProfileUpdate
 ): Promise<CandidateRecruitment> {
+  // Debug: Log incoming data
+  console.log('[DEBUG] updateProfile - incoming data:', JSON.stringify(data, null, 2))
+  console.log('[DEBUG] updateProfile - uniformShirtSize:', data.uniformShirtSize)
+  console.log('[DEBUG] updateProfile - uniformPantsSize:', data.uniformPantsSize)
+  console.log('[DEBUG] updateProfile - domicileAddress:', data.domicileAddress)
+
   // First check if candidate exists
   const existingResult = await candidateRepository.findById(candidateId)
 
@@ -164,6 +178,9 @@ export async function updateProfile(
   if (data.drivingLicense !== undefined) updateData.drivingLicense = data.drivingLicense
   if (data.uniformShirtSize !== undefined) updateData.uniformShirtSize = data.uniformShirtSize
   if (data.uniformPantsSize !== undefined) updateData.uniformPantsSize = data.uniformPantsSize
+
+  // Debug: Log updateData before calling repository
+  console.log('[DEBUG] updateProfile - updateData:', JSON.stringify(updateData, null, 2))
 
   const result = await candidateRepository.update(candidateId, updateData)
 
