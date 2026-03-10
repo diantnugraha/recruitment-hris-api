@@ -136,3 +136,16 @@ export const UpdateAssessmentBodySchema = Type.Object({
 })
 
 export type UpdateAssessmentBody = Static<typeof UpdateAssessmentBodySchema>
+
+// Start assessment (interview scheduling) schema
+export const InterviewTypeSchema = Type.Union([
+  Type.Literal('online'),
+  Type.Literal('onsite')
+])
+
+export const StartAssessmentBodySchema = Type.Object({
+  interview_date: Type.String({ format: 'date-time' }),
+  interview_type: InterviewTypeSchema
+})
+
+export type StartAssessmentBody = Static<typeof StartAssessmentBodySchema>

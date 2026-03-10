@@ -299,3 +299,129 @@ export async function saveAssessment(
     successResponse(transformAssessment(item))
   )
 }
+
+// ==================== SUBMIT BIODATA ====================
+
+export async function submitBiodata(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.candidate) {
+    throw new UnauthorizedError('Not authenticated')
+  }
+
+  await candidateProfileService.submitBiodata(request.candidate.candidateId)
+
+  return reply.status(200).send(
+    successResponse(null, 'Biodata submitted successfully')
+  )
+}
+
+// ==================== INTERVIEW PROGRESS ====================
+
+export async function getInterviewProgress(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.candidate) {
+    throw new UnauthorizedError('Not authenticated')
+  }
+
+  const progress = await candidateProfileService.getInterviewProgress(request.candidate.candidateId)
+
+  // If no assessment exists, return null (HR hasn't started the process yet)
+  if (!progress) {
+    return reply.status(200).send(successResponse(null))
+  }
+
+  return reply.status(200).send(
+    successResponse({
+      interview1: progress.interview1,
+      interview2: progress.interview2,
+      current_stage: progress.currentStage,
+      interview_started: progress.interviewStarted,
+      interview_started_at: progress.interviewStartedAt,
+      interview_date: progress.interviewDate,
+      interview_type: progress.interviewType,
+      all_passed: progress.allPassed,
+      any_failed: progress.anyFailed
+    })
+  )
+}
+
+// ==================== MCU STATUS ====================
+
+export async function getMcuStatus(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.candidate) {
+    throw new UnauthorizedError('Not authenticated')
+  }
+
+  const assessment = await candidateProfileService.getMcuStatus(request.candidate.candidateId)
+
+  // If no assessment exists, return null
+  if (!assessment) {
+    return reply.status(200).send(successResponse(null))
+  }
+
+  // Cast to access mcu_document fields
+  const record = assessment as unknown as Record<string, unknown>
+
+  return reply.status(200).send(
+    successResponse({
+      status: assessment.mcu_status,
+      description: assessment.mcu_desc,
+      document_url: (record.mcu_document_url as string) ?? null,
+      document_name: (record.mcu_document_name as string) ?? null
+    })
+  )
+}
+
+// ==================== ONBOARDING ====================
+
+export async function getOnboarding(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.candidate) {
+    throw new UnauthorizedError('Not authenticated')
+  }
+
+  const onboarding = await candidateProfileService.getOnboarding(request.candidate.candidateId)
+
+  // If no onboarding exists, return null (HR hasn't created it yet)
+  if (!onboarding) {
+    return reply.status(200).send(successResponse(null))
+  }
+
+  return reply.status(200).send(
+    successResponse({
+      id: Number(onboarding.id),
+      candidate_id: onboarding.candidate_id,
+      job_placement: onboarding.job_placement,
+      document: onboarding.document,
+      document_candidate: onboarding.document_candidate,
+      facilities: (onboarding.facilities || []).map(f => ({
+        id: Number(f.id),
+        inventory_no: f.inventory_no,
+        item: f.item,
+        qty: f.qty,
+        unit: f.unit,
+        condition: f.condition,
+        status: f.status
+      })),
+      programs: (onboarding.programs || []).map(p => ({
+        id: Number(p.id),
+        program: p.program,
+        date: p.date,
+        location: p.location,
+        pic: p.pic,
+        status: p.status
+      })),
+      created_at: onboarding.createdAt?.toISOString() || null,
+      updated_at: onboarding.updatedAt?.toISOString() || null
+    })
+  )
+}

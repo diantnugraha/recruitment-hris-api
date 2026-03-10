@@ -381,6 +381,7 @@ export async function update(id: number, data: UpdateCandidateData): Promise<Rep
     if (data.drivingLicense !== undefined) updateData.driving_license = data.drivingLicense
     if (data.uniformShirtSize !== undefined) updateData.uniform_shirt_size = data.uniformShirtSize
     if (data.uniformPantsSize !== undefined) updateData.uniform_pants_size = data.uniformPantsSize
+    updateData.updatedAt = new Date()
 
     // Debug: Log what we're sending to Prisma
     console.log('[DEBUG] repository.update - updateData for Prisma:', JSON.stringify(updateData, (key, value) =>
@@ -451,7 +452,7 @@ export async function generateToken(id: number): Promise<RepositoryResult<string
 
     await prisma.candidateRecruitment.update({
       where: { id: BigInt(id) },
-      data: { token }
+      data: { token, updatedAt: new Date() }
     })
 
     return success(token)
@@ -465,7 +466,7 @@ export async function verifyCandidate(id: number): Promise<RepositoryResult<bool
   try {
     await prisma.candidateRecruitment.update({
       where: { id: BigInt(id) },
-      data: { verify: 'VERIFIED' as CandidateVerify }
+      data: { verify: 'VERIFIED' as CandidateVerify, updatedAt: new Date() }
     })
     return success(true)
   } catch (error) {
@@ -493,7 +494,8 @@ export async function acceptAgreement(
       where: { id: BigInt(id) },
       data: {
         agreementAcceptedAt: new Date(),
-        agreementVersion: version || '1.0'
+        agreementVersion: version || '1.0',
+        updatedAt: new Date()
       }
     })
     return success(candidate)

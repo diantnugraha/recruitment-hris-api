@@ -161,6 +161,7 @@ export async function update(
     if (data.employeesYouKnow !== undefined) updateData.employees_you_know = data.employeesYouKnow
     if (data.relationshipWithEmployee !== undefined) updateData.relationship_with_the_employee = data.relationshipWithEmployee
     if (data.assessmentAssignedTo !== undefined) updateData.assessment_assigned_to = data.assessmentAssignedTo
+    updateData.updatedAt = new Date()
 
     const assessment = await prisma.candidate_recruitment_assessment.update({
       where: { id: BigInt(id) },
@@ -251,8 +252,12 @@ export async function getMcuDocument(
   }
 }
 
-// Start interview - sets interview_started_at to current timestamp
-export async function startInterview(candidateId: number): Promise<RepositoryResult<candidate_recruitment_assessment>> {
+// Start interview - sets interview_started_at, interview_date, and interview_type
+export async function startInterview(
+  candidateId: number,
+  interviewDate?: Date,
+  interviewType?: 'online' | 'onsite'
+): Promise<RepositoryResult<candidate_recruitment_assessment>> {
   try {
     const assessment = await prisma.candidate_recruitment_assessment.findFirst({
       where: { candidate_id: candidateId }
@@ -269,7 +274,12 @@ export async function startInterview(candidateId: number): Promise<RepositoryRes
 
     const updated = await prisma.candidate_recruitment_assessment.update({
       where: { id: assessment.id },
-      data: { interview_started_at: new Date() }
+      data: {
+        interview_started_at: new Date(),
+        ...(interviewDate && { interview_date: interviewDate }),
+        ...(interviewType && { interview_type: interviewType === 'online' ? 'ONLINE' : 'ONSITE' }),
+        updatedAt: new Date()
+      }
     })
 
     return success(updated)
@@ -351,14 +361,16 @@ export async function hasFailedAnyAssessment(candidateId: number): Promise<Repos
 
 // Get assessment progress (how many stages completed)
 export type AssessmentProgress = {
-  interview1: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean }
-  interview2: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean }
+  interview1: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean; description: string }
+  interview2: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean; description: string }
   mcu: { status: string; passed: boolean; failed: boolean; pending: boolean; locked: boolean }
   allPassed: boolean
   anyFailed: boolean
   currentStage: 'interview1' | 'interview2' | 'mcu' | 'completed' | 'failed'
   interviewStarted: boolean
   interviewStartedAt: string | null
+  interviewDate: string | null
+  interviewType: string | null
 }
 
 // ==================== Scoring CRUD ====================
@@ -487,6 +499,7 @@ export async function upsertScoring(data: CreateScoringData): Promise<Repository
         interviewer_notes: data.interviewerNotes ?? Prisma.DbNull,
         assessed_by: data.assessedBy ?? null,
         assessed_at: new Date(),
+        updatedAt: new Date(),
       }
     })
     return success(scoring)
@@ -516,7 +529,8 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       passed: assessment.interview1_status === 'PASSED',
       failed: assessment.interview1_status === 'FAILED',
       pending: assessment.interview1_status === 'PENDING',
-      locked: !interviewStarted // Interview 1 is locked until interview is started
+      locked: !interviewStarted,
+      description: assessment.interview1_desc || ''
     }
 
     const interview2 = {
@@ -524,7 +538,8 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       passed: assessment.interview2_status === 'PASSED',
       failed: assessment.interview2_status === 'FAILED',
       pending: assessment.interview2_status === 'PENDING',
-      locked: !interview1.passed // Interview 2 is locked until Interview 1 passes
+      locked: !interview1.passed,
+      description: assessment.interview2_desc || ''
     }
 
     const mcu = {
@@ -549,6 +564,9 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       currentStage = 'interview2'
     }
 
+    // Cast to access interview_date and interview_type fields
+    const record = assessment as unknown as Record<string, unknown>
+
     return success({
       interview1,
       interview2,
@@ -557,7 +575,9 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       anyFailed,
       currentStage,
       interviewStarted,
-      interviewStartedAt: assessment.interview_started_at?.toISOString() || null
+      interviewStartedAt: assessment.interview_started_at?.toISOString() || null,
+      interviewDate: record.interview_date ? (record.interview_date as Date).toISOString() : null,
+      interviewType: (record.interview_type as string) ?? null
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get assessment progress'

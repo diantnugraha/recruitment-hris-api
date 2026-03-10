@@ -201,4 +201,144 @@ export async function candidateProfileRoutes(app: FastifyInstance): Promise<void
     preHandler: authenticateCandidate,
     handler: candidateProfileController.saveAssessment
   })
+
+  // ==================== SUBMIT BIODATA ====================
+
+  // POST /v1/candidate-profile/submit
+  app.post('/submit', {
+    schema: {
+      tags: ['Candidate Profile'],
+      summary: 'Submit candidate biodata (marks biodata as completed)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Null(),
+          message: Type.String()
+        })
+      }
+    },
+    preHandler: authenticateCandidate,
+    handler: candidateProfileController.submitBiodata
+  })
+
+  // ==================== INTERVIEW PROGRESS (Read-Only) ====================
+
+  // GET /v1/candidate-profile/interview-progress
+  app.get('/interview-progress', {
+    schema: {
+      tags: ['Candidate Profile'],
+      summary: 'Get candidate interview progress (read-only, managed by HR)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Union([
+            Type.Object({
+              interview1: Type.Object({
+                status: Type.String(),
+                passed: Type.Boolean(),
+                failed: Type.Boolean(),
+                pending: Type.Boolean(),
+                locked: Type.Boolean(),
+                description: Type.String()
+              }),
+              interview2: Type.Object({
+                status: Type.String(),
+                passed: Type.Boolean(),
+                failed: Type.Boolean(),
+                pending: Type.Boolean(),
+                locked: Type.Boolean(),
+                description: Type.String()
+              }),
+              current_stage: Type.String(),
+              interview_started: Type.Boolean(),
+              interview_started_at: Type.Union([Type.String(), Type.Null()]),
+              interview_date: Type.Union([Type.String(), Type.Null()]),
+              interview_type: Type.Union([Type.String(), Type.Null()]),
+              all_passed: Type.Boolean(),
+              any_failed: Type.Boolean()
+            }),
+            Type.Null()
+          ])
+        })
+      }
+    },
+    preHandler: authenticateCandidate,
+    handler: candidateProfileController.getInterviewProgress
+  })
+
+  // ==================== MCU STATUS (Read-Only) ====================
+
+  // GET /v1/candidate-profile/mcu-status
+  app.get('/mcu-status', {
+    schema: {
+      tags: ['Candidate Profile'],
+      summary: 'Get candidate MCU status (read-only, managed by HR)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Union([
+            Type.Object({
+              status: Type.String(),
+              description: Type.String(),
+              document_url: Type.Union([Type.String(), Type.Null()]),
+              document_name: Type.Union([Type.String(), Type.Null()])
+            }),
+            Type.Null()
+          ])
+        })
+      }
+    },
+    preHandler: authenticateCandidate,
+    handler: candidateProfileController.getMcuStatus
+  })
+
+  // ==================== ONBOARDING (Read-Only) ====================
+
+  // GET /v1/candidate-profile/onboarding
+  app.get('/onboarding', {
+    schema: {
+      tags: ['Candidate Profile'],
+      summary: 'Get candidate onboarding data (read-only, managed by HR)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Union([
+            Type.Object({
+              id: Type.Number(),
+              candidate_id: Type.Number(),
+              job_placement: Type.String(),
+              document: Type.String(),
+              document_candidate: Type.String(),
+              facilities: Type.Array(Type.Object({
+                id: Type.Number(),
+                inventory_no: Type.String(),
+                item: Type.String(),
+                qty: Type.Number(),
+                unit: Type.String(),
+                condition: Type.String(),
+                status: Type.String()
+              })),
+              programs: Type.Array(Type.Object({
+                id: Type.Number(),
+                program: Type.String(),
+                date: Type.String(),
+                location: Type.String(),
+                pic: Type.String(),
+                status: Type.String()
+              })),
+              created_at: Type.Union([Type.String(), Type.Null()]),
+              updated_at: Type.Union([Type.String(), Type.Null()])
+            }),
+            Type.Null()
+          ])
+        })
+      }
+    },
+    preHandler: authenticateCandidate,
+    handler: candidateProfileController.getOnboarding
+  })
 }

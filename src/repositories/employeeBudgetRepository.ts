@@ -144,7 +144,8 @@ export async function update(
         ...(data.year !== undefined && { year: data.year }),
         ...(data.technical !== undefined && { technical: data.technical }),
         ...(data.admin !== undefined && { admin: data.admin }),
-        ...(data.document !== undefined && { document: data.document })
+        ...(data.document !== undefined && { document: data.document }),
+        updatedAt: new Date()
       },
       select: employeeBudgetSelectFields
     })

@@ -94,7 +94,8 @@ export async function update(id: number, data: UpdateDivisionData): Promise<Repo
       data: {
         name: data.name,
         code: data.code,
-        description: data.description
+        description: data.description,
+        updatedAt: new Date()
       }
     })
     return success(division)

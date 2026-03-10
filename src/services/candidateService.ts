@@ -2,7 +2,7 @@ import type { CandidateRecruitment } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
-import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate } from './emailService.js'
+import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate } from './emailService.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
@@ -513,8 +513,11 @@ export async function getAssessmentProgress(candidateId: number): Promise<Assess
   return result.getValue()
 }
 
-export async function startAssessment(candidateId: number): Promise<AssessmentProgress> {
-  // Check if candidate exists
+export async function startAssessment(
+  candidateId: number,
+  interviewDate?: string,
+  interviewType?: 'online' | 'onsite'
+): Promise<AssessmentProgress> {
   const candidateResult = await candidateRepository.findById(candidateId)
   if (candidateResult.isFailure()) {
     throw new Error(candidateResult.error)
@@ -541,10 +544,30 @@ export async function startAssessment(candidateId: number): Promise<AssessmentPr
     throw new NotFoundError('Assessment not found. Candidate must be linked to an employee request first.')
   }
 
-  // Start the interview
-  const startResult = await candidateAssessmentRepository.startInterview(candidateId)
+  const parsedDate = interviewDate ? new Date(interviewDate) : undefined
+  const startResult = await candidateAssessmentRepository.startInterview(candidateId, parsedDate, interviewType)
   if (startResult.isFailure()) {
     throw new Error(startResult.error)
+  }
+
+  // Send interview schedule email to candidate
+  if (interviewDate && interviewType) {
+    const jobTitle = candidate.jobTitle?.name || 'Position'
+    const portalUrl = `${process.env.CANDIDATE_PORTAL_URL || 'http://localhost:3001'}/profile`
+
+    try {
+      await sendInterviewScheduleEmail({
+        candidateEmail: candidate.email,
+        candidateName: candidate.fullname,
+        jobTitle,
+        interviewDate,
+        interviewType,
+        portalUrl,
+      })
+    } catch (error) {
+      // Log but don't fail the operation if email fails
+      console.error(`[EMAIL] Failed to send interview schedule email to ${candidate.email}:`, error)
+    }
   }
 
   // Return updated progress

@@ -117,6 +117,7 @@ export async function update(
     if (data.candidateVerify !== undefined) {
       updateData.candidate_verify = data.candidateVerify ? 'VERIFIED' : 'NOT_VERIFIED'
     }
+    updateData.updatedAt = new Date()
 
     const detail = await prisma.candidate_recruitment_detail.update({
       where: { id: BigInt(id) },
@@ -158,7 +159,7 @@ export async function verifyCandidate(id: number): Promise<RepositoryResult<bool
   try {
     await prisma.candidate_recruitment_detail.update({
       where: { id: BigInt(id) },
-      data: { candidate_verify: 'VERIFIED' }
+      data: { candidate_verify: 'VERIFIED', updatedAt: new Date() }
     })
     return success(true)
   } catch (error) {

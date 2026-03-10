@@ -139,7 +139,8 @@ export async function update(id: number, data: UpdateDepartmentData): Promise<Re
         obsId: data.obsId,
         divisionId: data.divisionId,
         category: toPrismaCategory(data.category),
-        description: data.description
+        description: data.description,
+        updatedAt: new Date()
       },
       select: departmentSelectFields
     })

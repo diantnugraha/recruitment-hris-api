@@ -303,6 +303,7 @@ export async function update(id: number, data: UpdateEmployeeRequestData): Promi
     if (data.codeRecruitment !== undefined) updateData.codeRecruitment = data.codeRecruitment
     if (data.reviewedAt !== undefined) updateData.reviewedAt = data.reviewedAt
     if (data.approvedAt !== undefined) updateData.approvedAt = data.approvedAt
+    updateData.updatedAt = new Date()
 
     const employeeRequest = await prisma.employeeRequest.update({
       where: { id: BigInt(id) },
@@ -327,7 +328,7 @@ export async function softDelete(id: number): Promise<RepositoryResult<boolean>>
   try {
     await prisma.employeeRequest.update({
       where: { id: BigInt(id) },
-      data: { isDeleted: 1 }
+      data: { isDeleted: 1, updatedAt: new Date() }
     })
     return success(true)
   } catch (error) {

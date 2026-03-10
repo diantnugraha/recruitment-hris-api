@@ -94,7 +94,8 @@ export async function update(id: number, data: UpdateObsData): Promise<Repositor
       data: {
         name: data.name,
         cluster: data.cluster,
-        description: data.description
+        description: data.description,
+        updatedAt: new Date()
       }
     })
     return success(obs)

@@ -20,7 +20,7 @@ model User {
   emailVerifiedAt DateTime? @map("email_verified_at")
   userImei        String?   @map("user_imei") @db.VarChar(100)
   created_at      DateTime? @default(now())
-  updated_at      DateTime? @updatedAt
+  updated_at      DateTime?
   trash           DateTime? @map("deleted_at")
 
   role     Role       @relation(fields: [roleId], references: [roleId])
@@ -87,7 +87,7 @@ model UserFile {
   type      String   @db.VarChar(50)
   location  String   @db.VarChar(500)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime? @map("updated_at")
 
   user User @relation(fields: [userId], references: [id])
 
@@ -103,7 +103,7 @@ model Obs {
   cluster     String?   @db.VarChar(100)
   description String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime? @map("updated_at")
 
   departments Department[]
 
@@ -118,7 +118,7 @@ model Division {
   code        String?   @db.VarChar(50)
   description String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime? @map("updated_at")
 
   departments Department[]
   jobTitles   JobTitle[]
@@ -137,7 +137,7 @@ model Department {
   category    String    @db.VarChar(50)
   description String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime? @map("updated_at")
 
   obs             Obs                  @relation(fields: [obsId], references: [id])
   division        Division?            @relation(fields: [divisionId], references: [id])
@@ -163,7 +163,7 @@ model JobLevel {
   canCreateKpi      Boolean           @default(false) @map("can_create_kpi")
   order             Int?
   createdAt         DateTime?         @default(now()) @map("created_at")
-  updatedAt         DateTime?         @updatedAt @map("updated_at")
+  updatedAt         DateTime?         @map("updated_at")
 
   jobTitles JobTitle[]
 
@@ -188,7 +188,7 @@ model JobTitle {
   requirement    String?       @db.Text
   type           JobTitleType?
   createdAt      DateTime?     @default(now()) @map("created_at")
-  updatedAt      DateTime?     @updatedAt @map("updated_at")
+  updatedAt      DateTime?     @map("updated_at")
 
   jobLevel     JobLevel   @relation(fields: [jobLevelId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   division     Division?  @relation(fields: [divisionId], references: [id])
@@ -224,8 +224,8 @@ model EmployeeBudget {
   technical    Int
   admin        Int
   document     String    @db.VarChar(100)
-  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
   department   Department @relation(fields: [departmentId], references: [id])
 
@@ -263,7 +263,7 @@ model EmployeeRequest {
   reviewedAt            DateTime?             @map("reviewed_at") @db.Timestamp(0)
   approvedAt            DateTime?             @map("approved_at") @db.Timestamp(0)
   createdAt             DateTime?             @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt             DateTime?             @updatedAt @map("updated_at") @db.Timestamp(0)
+  updatedAt             DateTime?             @map("updated_at") @db.Timestamp(0)
 
   createdByUser User                      @relation(fields: [createdBy], references: [id])
   comments      EmployeeRequestComment[]
@@ -277,7 +277,7 @@ model EmployeeRequestComment {
   userId            Int       @map("user_id")
   comment           String    @db.Text
   createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt         DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  updatedAt         DateTime? @map("updated_at") @db.Timestamp(0)
 
   employeeRequest EmployeeRequest @relation(fields: [employeeRequestId], references: [id], onDelete: Cascade)
   user            User            @relation(fields: [userId], references: [id])
@@ -325,7 +325,7 @@ model CandidateRecruitment {
   agreementAcceptedAt DateTime?  @map("agreement_accepted_at") @db.Timestamp(0)
   agreementVersion    String?    @map("agreement_version") @db.VarChar(20)
   createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt      DateTime?       @updatedAt @map("updated_at") @db.Timestamp(0)
+  updatedAt      DateTime?       @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment")
 }
@@ -339,8 +339,8 @@ model candidate_recruitment_detail {
   id                  BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
   candidate_id        Int
   job_title_id        Int
-  createdAt           DateTime?            @map("created_at") @db.Timestamp(0)
-  updatedAt           DateTime?            @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt           DateTime?            @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime?            @map("updated_at") @db.Timestamp(0)
   candidate_code      String               @db.VarChar(30)
   candidate_token     String               @db.Text
   candidate_verify    CandidateDetailVerify
@@ -379,10 +379,12 @@ model candidate_recruitment_assessment {
   employees_you_know            String           @db.VarChar(30)
   relationship_with_the_employee String          @db.VarChar(30)
   ref_mobile_phone              String           @db.VarChar(30)
-  createdAt                     DateTime?        @map("created_at") @db.Timestamp(0)
-  updatedAt                     DateTime?        @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt                     DateTime?        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                     DateTime?        @map("updated_at") @db.Timestamp(0)
   assessment_assigned_to        String           @db.VarChar(50)
   interview_started_at          DateTime?        @map("interview_started_at") @db.Timestamp(0)
+  interview_date                DateTime?        @map("interview_date") @db.Timestamp(0)
+  interview_type                InterviewType?   @map("interview_type")
   mcu_document_url              String?          @map("mcu_document_url") @db.VarChar(500)
   mcu_document_name             String?          @map("mcu_document_name") @db.VarChar(255)
 
@@ -390,6 +392,11 @@ model candidate_recruitment_assessment {
   assignees candidate_assessment_assignee[]
 
   @@map("candidate_recruitment_assessment")
+}
+
+enum InterviewType {
+  ONLINE  @map("online")
+  ONSITE  @map("onsite")
 }
 
 enum InterviewStage {
@@ -430,7 +437,7 @@ model candidate_assessment_scoring {
   assessed_by             String?              @db.VarChar(50)
   assessed_at             DateTime?            @db.Timestamp(0)
   createdAt               DateTime?            @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt               DateTime?            @updatedAt @map("updated_at") @db.Timestamp(0)
+  updatedAt               DateTime?            @map("updated_at") @db.Timestamp(0)
 
   assessment candidate_recruitment_assessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
 
@@ -464,11 +471,42 @@ model candidate_recruitment_onboarding {
   candidate_recruitment_detail_id Int
   job_placement                 String    @db.VarChar(30)
   document                      String    @db.VarChar(100)
-  createdAt                     DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt                     DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt                     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                     DateTime? @map("updated_at") @db.Timestamp(0)
   document_candidate            String    @db.Text
 
   @@map("candidate_recruitment_onboarding")
+}
+
+model facillities {
+  id                                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  inventory_no                      String    @db.VarChar(255)
+  item                              String    @db.VarChar(255)
+  qty                               Int       @default(1)
+  unit                              String    @db.VarChar(50)
+  condition                         String    @db.VarChar(50)
+  status                            String    @db.VarChar(50)
+  created_at                        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at                        DateTime? @db.Timestamp(0)
+  candidate_recruitment_onboarding_id Int
+
+  @@index([candidate_recruitment_onboarding_id])
+  @@map("facillities")
+}
+
+model OnboardingProgram {
+  id                                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_recruitment_onboarding_id Int
+  program                           String    @db.VarChar(255)
+  date                              String    @db.VarChar(50)
+  location                          String    @db.VarChar(255)
+  pic                               String    @db.VarChar(255)
+  status                            String    @db.VarChar(50)
+  createdAt                         DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                         DateTime? @map("updated_at") @db.Timestamp(0)
+
+  @@index([candidate_recruitment_onboarding_id])
+  @@map("onboarding_program")
 }
 
 model candidate_recruitment_educational_background {
@@ -479,8 +517,8 @@ model candidate_recruitment_educational_background {
   degree            String    @db.VarChar(30)
   major             String    @db.VarChar(30)
   year_graduate     Int
-  createdAt         DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt         DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime? @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_educational_background")
 }
@@ -493,8 +531,8 @@ model candidate_recruitment_work_experiences {
   job_title         String    @db.VarChar(30)
   period            String    @db.VarChar(30)
   length_of_working String    @db.VarChar(30)
-  createdAt         DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt         DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime? @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_work_experiences")
 }
@@ -507,8 +545,8 @@ model candidate_recruitment_family_members {
   age          Int
   education    String    @db.VarChar(30)
   work         String    @db.VarChar(30)
-  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_family_members")
 }
@@ -521,8 +559,8 @@ model candidate_recruitment_course_experience {
   year         Int
   city         String    @db.VarChar(30)
   certificate  String    @db.VarChar(100)
-  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_course_experience")
 }

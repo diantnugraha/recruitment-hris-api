@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm ls:*)",
-      "Bash(npx prisma migrate deploy)"
+      "Bash(npx prisma migrate deploy)",
+      "Bash(npx prisma generate)",
+      "Bash(npx tsc --noEmit)"
     ]
   }
 }

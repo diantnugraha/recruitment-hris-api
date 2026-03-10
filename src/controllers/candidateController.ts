@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
+import type { StartAssessmentBody } from '../schemas/candidateSchemas.js'
 import * as candidateService from '../services/candidateService.js'
 import * as candidateProfileRepository from '../repositories/candidateProfileRepository.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
@@ -331,12 +332,13 @@ export async function getAssessmentProgress(
 }
 
 export async function startAssessment(
-  request: FastifyRequest<{ Params: IdParam }>,
+  request: FastifyRequest<{ Params: IdParam; Body: StartAssessmentBody }>,
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
+  const { interview_date, interview_type } = request.body
 
-  const progress = await candidateService.startAssessment(id)
+  const progress = await candidateService.startAssessment(id, interview_date, interview_type)
 
   sendSuccess(reply, progress, 'Assessment started successfully')
 }

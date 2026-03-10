@@ -501,6 +501,163 @@ export async function sendOnboardingEmail(data: OnboardingEmailData): Promise<vo
   console.log(`[MAILGUN] Onboarding email sent to ${data.candidateEmail}`)
 }
 
+// --- Interview Schedule Email (to Candidate) ---
+
+export type InterviewScheduleEmailData = {
+  candidateEmail: string
+  candidateName: string
+  jobTitle: string
+  interviewDate: string
+  interviewType: 'online' | 'onsite'
+  portalUrl: string
+}
+
+function getInterviewScheduleTemplate(data: InterviewScheduleEmailData & { companyName: string }): string {
+  const formattedDate = new Date(data.interviewDate).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  })
+
+  const typeLabel = data.interviewType === 'online' ? 'Online (Virtual)' : 'Onsite (Tatap Muka)'
+  const typeColor = data.interviewType === 'online' ? '#3b82f6' : '#059669'
+  const typeIcon = data.interviewType === 'online' ? '💻' : '🏢'
+
+  return `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadwal Interview</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #6366f1; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                ${data.companyName}
+              </h1>
+              <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 14px;">
+                Interview Invitation
+              </p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
+                Dear ${data.candidateName},
+              </h2>
+
+              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                We are pleased to inform you that your application has been reviewed and you have been scheduled for an interview. Please find the details below:
+              </p>
+
+              <!-- Interview Details Card -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid ${typeColor};">
+                <tr>
+                  <td style="padding: 24px;">
+                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Position
+                    </p>
+                    <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                      ${data.jobTitle}
+                    </p>
+
+                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Interview Date & Time
+                    </p>
+                    <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 16px; font-weight: 500;">
+                      📅 ${formattedDate} WIB
+                    </p>
+
+                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Interview Type
+                    </p>
+                    <p style="margin: 0; color: ${typeColor}; font-size: 16px; font-weight: 600;">
+                      ${typeIcon} ${typeLabel}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Please make sure you are available at the scheduled time. You can check your interview status and details through our Candidate Portal.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <a href="${data.portalUrl}"
+                       style="display: inline-block; padding: 14px 32px; background-color: #6366f1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
+                      Open Candidate Portal
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                If the button above doesn't work, you can copy and paste the following link into your browser:
+              </p>
+              <p style="margin: 8px 0 20px 0; word-break: break-all; color: #6366f1; font-size: 14px;">
+                ${data.portalUrl}
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+              <p style="margin: 0; color: #9ca3af; font-size: 14px;">
+                If you have any questions or need to reschedule, please contact our HR department.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} ${data.companyName}. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `
+}
+
+export async function sendInterviewScheduleEmail(data: InterviewScheduleEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getInterviewScheduleTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.companyName} HR <${config.from}>`,
+    to: data.candidateEmail,
+    subject: `Interview Invitation - ${data.jobTitle} at ${config.companyName}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Interview schedule email sent to ${data.candidateEmail}`)
+}
+
 // --- Utility Functions ---
 
 export async function verifyEmailConfiguration(): Promise<boolean> {

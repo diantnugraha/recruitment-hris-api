@@ -167,7 +167,8 @@ export async function update(id: number, data: UpdateUserRestData): Promise<Repo
         name: data.name,
         roleId: data.roleId,
         employeeId: data.employeeId,
-        superiorId: data.superiorId
+        superiorId: data.superiorId,
+        updated_at: new Date()
       },
       select: userSelectFields
     })
@@ -182,7 +183,7 @@ export async function updatePassword(id: number, hashedPassword: string): Promis
   try {
     const user = await prisma.user.update({
       where: { id },
-      data: { password: hashedPassword },
+      data: { password: hashedPassword, updated_at: new Date() },
       select: userSelectFields
     })
     return success(user)
@@ -196,7 +197,7 @@ export async function softDelete(id: number): Promise<RepositoryResult<boolean>>
   try {
     await prisma.user.update({
       where: { id },
-      data: { trash: new Date() }
+      data: { trash: new Date(), updated_at: new Date() }
     })
     return success(true)
   } catch (error) {

@@ -7,7 +7,10 @@ import type {
 } from '@prisma/client'
 
 import * as candidateProfileRepository from '../repositories/candidateProfileRepository.js'
-import { BadRequestError } from '../errors/index.js'
+import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
+import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
+import * as onboardingRepository from '../repositories/onboardingRepository.js'
+import { BadRequestError, NotFoundError } from '../errors/index.js'
 
 // ==================== EDUCATIONAL BACKGROUND ====================
 
@@ -237,6 +240,63 @@ export async function saveAssessment(
 
   if (result.isFailure()) {
     throw new BadRequestError(result.getError() || 'Failed to save assessment')
+  }
+
+  return result.getValue()
+}
+
+// ==================== SUBMIT BIODATA ====================
+
+export async function submitBiodata(candidateId: number): Promise<void> {
+  const detailResult = await candidateProfileRepository.findDetailByCandidateId(candidateId)
+
+  if (detailResult.isFailure()) {
+    throw new BadRequestError(detailResult.getError() || 'Failed to fetch candidate detail')
+  }
+
+  const detail = detailResult.getValue()
+  if (!detail) {
+    throw new NotFoundError('Candidate detail not found')
+  }
+
+  const result = await candidateDetailRepository.verifyCandidate(detail.id)
+
+  if (result.isFailure()) {
+    throw new BadRequestError(result.getError() || 'Failed to submit biodata')
+  }
+}
+
+// ==================== INTERVIEW PROGRESS ====================
+
+export async function getInterviewProgress(candidateId: number) {
+  const result = await candidateAssessmentRepository.getProgress(candidateId)
+
+  if (result.isFailure()) {
+    throw new BadRequestError(result.getError() || 'Failed to fetch interview progress')
+  }
+
+  return result.getValue()
+}
+
+// ==================== MCU STATUS ====================
+
+export async function getMcuStatus(candidateId: number) {
+  const result = await candidateAssessmentRepository.findByCandidateId(candidateId)
+
+  if (result.isFailure()) {
+    throw new BadRequestError(result.getError() || 'Failed to fetch MCU status')
+  }
+
+  return result.getValue()
+}
+
+// ==================== ONBOARDING ====================
+
+export async function getOnboarding(candidateId: number) {
+  const result = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+
+  if (result.isFailure()) {
+    throw new BadRequestError(result.getError() || 'Failed to fetch onboarding data')
   }
 
   return result.getValue()

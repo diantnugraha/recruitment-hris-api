@@ -322,7 +322,8 @@ export async function upsertAssessment(
           when_ready_work: data.readyToWork ?? existing.when_ready_work,
           relationship_with_the_employee: data.employeeRelationship ?? existing.relationship_with_the_employee,
           ref_contact_name: data.referenceContactName ?? existing.ref_contact_name,
-          ref_mobile_phone: data.referenceContactPhone ?? existing.ref_mobile_phone
+          ref_mobile_phone: data.referenceContactPhone ?? existing.ref_mobile_phone,
+          updatedAt: new Date()
         }
       })
       return success(updated)

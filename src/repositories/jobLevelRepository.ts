@@ -123,6 +123,7 @@ export async function update(
     }
     if (data.can_create_kpi !== undefined) updateData.canCreateKpi = data.can_create_kpi
     if (data.order !== undefined) updateData.order = data.order
+    updateData.updatedAt = new Date()
 
     const jobLevel = await prisma.jobLevel.update({
       where: { id },

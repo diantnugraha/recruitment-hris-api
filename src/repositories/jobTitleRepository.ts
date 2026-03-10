@@ -252,7 +252,8 @@ export async function update(
       ...(data.type !== undefined && { type: data.type }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.purpose !== undefined && { purpose: data.purpose }),
-      ...(data.requirement !== undefined && { requirement: data.requirement })
+      ...(data.requirement !== undefined && { requirement: data.requirement }),
+      updatedAt: new Date()
     }
 
     const jobTitle = await prisma.jobTitle.update({

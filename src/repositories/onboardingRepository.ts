@@ -118,6 +118,7 @@ export async function updateOnboarding(
     if (data.jobPlacement !== undefined) updateData.job_placement = data.jobPlacement
     if (data.document !== undefined) updateData.document = data.document
     if (data.documentCandidate !== undefined) updateData.document_candidate = data.documentCandidate
+    updateData.updatedAt = new Date()
 
     const onboarding = await prisma.candidate_recruitment_onboarding.update({
       where: { id: BigInt(id) },

@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import * as candidateController from '../controllers/candidateController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
+import { StartAssessmentBodySchema, type StartAssessmentBody } from '../schemas/candidateSchemas.js'
 
 // Body types for routes
 type UpdateCandidateBody = {
@@ -152,9 +153,9 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   )
 
   // Start assessment (unlock interview process)
-  app.post<{ Params: IdParam }>(
+  app.post<{ Params: IdParam; Body: StartAssessmentBody }>(
     '/:id/assessment/start',
-    { schema: { params: IdParamSchema } },
+    { schema: { params: IdParamSchema, body: StartAssessmentBodySchema } },
     candidateController.startAssessment
   )
 
