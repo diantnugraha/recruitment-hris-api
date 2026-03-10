@@ -179,6 +179,13 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     candidateController.getAssessmentScoring
   )
 
+  // Get assessment assignees (interviewers assigned for Interview User)
+  app.get<{ Params: IdParam }>(
+    '/:id/assessment/assignees',
+    { schema: { params: IdParamSchema } },
+    candidateController.getAssessmentAssignees
+  )
+
   // Update MCU
   app.put<{ Params: IdParam; Body: AssessmentUpdateBody }>(
     '/:id/assessment/mcu',
@@ -228,6 +235,13 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     '/:id/onboarding',
     { schema: { params: IdParamSchema } },
     candidateController.updateOnboarding
+  )
+
+  // Send onboarding email to candidate
+  app.post<{ Params: IdParam; Body: { portal_base_url: string } }>(
+    '/:id/onboarding/send',
+    { schema: { params: IdParamSchema } },
+    candidateController.sendOnboarding
   )
 
   // ==================== Facilities ====================

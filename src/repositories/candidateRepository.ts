@@ -29,6 +29,7 @@ export type CandidateWithDetail = CandidateRecruitment & {
     id: bigint
     code: string
     jobTitleId: bigint
+    jobPlacement: string | null
   } | null | undefined
 }
 
@@ -140,7 +141,7 @@ export async function findAll(
         if (detail?.employee_request_id) {
           employeeRequest = await prisma.employeeRequest.findUnique({
             where: { id: BigInt(detail.employee_request_id) },
-            select: { id: true, code: true, jobTitleId: true }
+            select: { id: true, code: true, jobTitleId: true, jobPlacement: true }
           })
         }
 
@@ -201,7 +202,7 @@ export async function findById(id: number): Promise<RepositoryResult<CandidateWi
     if (detail?.employee_request_id) {
       employeeRequest = await prisma.employeeRequest.findUnique({
         where: { id: BigInt(detail.employee_request_id) },
-        select: { id: true, code: true, jobTitleId: true }
+        select: { id: true, code: true, jobTitleId: true, jobPlacement: true }
       })
     }
 
@@ -300,7 +301,7 @@ export async function findByEmployeeRequestId(
 
         const employeeRequest = await prisma.employeeRequest.findUnique({
           where: { id: BigInt(employeeRequestId) },
-          select: { id: true, code: true, jobTitleId: true }
+          select: { id: true, code: true, jobTitleId: true, jobPlacement: true }
         })
 
         return {

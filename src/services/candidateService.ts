@@ -2,11 +2,12 @@ import type { CandidateRecruitment } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
-import { sendCandidateInvitationEmail } from './emailService.js'
+import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate } from './emailService.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
+import * as employeeRepository from '../repositories/employeeRepository.js'
 
 // Generate random 8-character password (alphanumeric)
 function generateRandomPassword(): string {
@@ -39,6 +40,7 @@ export type InterviewScoringPayload = {
   keyCompetencies?: string | null | undefined
   interviewerNotes?: string | null | undefined
   assessedBy?: string | null | undefined
+  assessorIds?: number[] | undefined
 }
 
 const SCORE_LABELS: Record<number, string> = {
@@ -77,6 +79,74 @@ function computeTotalScore(scoring: ScoringInput): number {
     scoring.understandingOfPosition +
     scoring.teamworkAbility
   )
+}
+
+// ==================== Assessor Notification Helper ====================
+
+type AssessorNotificationParams = {
+  candidateId: number
+  assessorIds: number[]
+  interviewType: 'Interview User' | 'Interview HR'
+}
+
+async function sendAssessorNotifications(params: AssessorNotificationParams): Promise<void> {
+  const { candidateId, assessorIds, interviewType } = params
+
+  // Fetch candidate details
+  const candidateResult = await candidateRepository.findById(candidateId)
+  if (candidateResult.isFailure()) {
+    console.error(`[EMAIL] Failed to fetch candidate ${candidateId}:`, candidateResult.error)
+    return
+  }
+
+  const candidate = candidateResult.getValue()
+  if (!candidate) {
+    console.error(`[EMAIL] Candidate ${candidateId} not found`)
+    return
+  }
+
+  const candidateName = candidate.fullname
+  const jobTitle = candidate.jobTitle?.name || 'Position'
+  const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/recruitment/${candidateId}`
+
+  // Send email to each assessor
+  for (const assessorId of assessorIds) {
+    try {
+      const employeeResult = await employeeRepository.findById(assessorId)
+      if (employeeResult.isFailure()) {
+        console.error(`[EMAIL] Failed to fetch employee ${assessorId}:`, employeeResult.error)
+        continue
+      }
+
+      const employee = employeeResult.getValue()
+      if (!employee) {
+        console.error(`[EMAIL] Employee ${assessorId} not found`)
+        continue
+      }
+
+      const assessorName = employee.employeeName || `Employee ${assessorId}`
+      const assessorEmail = employee.employeeEmail
+
+      if (!assessorEmail) {
+        console.error(`[EMAIL] Employee ${assessorId} has no email`)
+        continue
+      }
+
+      await sendInterviewAssignmentEmail({
+        assessorEmail,
+        assessorName,
+        candidateName,
+        jobTitle,
+        interviewType,
+        dashboardUrl,
+      })
+
+      console.log(`[EMAIL] Interview assignment sent to ${assessorEmail} for candidate ${candidateName}`)
+    } catch (error) {
+      console.error(`[EMAIL] Failed to send email to assessor ${assessorId}:`, error)
+      // Continue with other assessors even if one fails
+    }
+  }
 }
 
 export type CreateCandidateServiceData = {
@@ -532,6 +602,25 @@ export async function updateInterview1(
     if (scoringResult.isFailure()) {
       throw new Error(scoringResult.error)
     }
+
+    // Set assessor assignees for Interview User stage
+    if (scoringPayload.assessorIds && scoringPayload.assessorIds.length > 0) {
+      const assigneesResult = await candidateAssessmentRepository.setAssignees(
+        assessment.id,
+        scoringPayload.assessorIds
+      )
+
+      if (assigneesResult.isFailure()) {
+        throw new Error(assigneesResult.error)
+      }
+
+      // Send email notifications to assigned assessors
+      await sendAssessorNotifications({
+        candidateId,
+        assessorIds: scoringPayload.assessorIds,
+        interviewType: 'Interview User',
+      })
+    }
   }
 
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
@@ -781,6 +870,45 @@ export async function getAssessmentScoring(
   return result.getValue()
 }
 
+export type AssessmentAssignee = {
+  employeeId: number
+  employeeName: string | null
+  employeeEmail: string | null
+  assignedAt: Date
+}
+
+export async function getAssessmentAssignees(candidateId: number): Promise<AssessmentAssignee[]> {
+  const assigneeIdsResult = await candidateAssessmentRepository.getAssigneesByCandidateId(candidateId)
+
+  if (assigneeIdsResult.isFailure()) {
+    throw new Error(assigneeIdsResult.error)
+  }
+
+  const employeeIds = assigneeIdsResult.getValue()
+  if (employeeIds.length === 0) {
+    return []
+  }
+
+  // Fetch employee details for each assignee
+  const assignees: AssessmentAssignee[] = []
+  for (const employeeId of employeeIds) {
+    const employeeResult = await employeeRepository.findById(employeeId)
+    if (employeeResult.isSuccess()) {
+      const employee = employeeResult.getValue()
+      if (employee) {
+        assignees.push({
+          employeeId: employee.employeeId,
+          employeeName: employee.employeeName,
+          employeeEmail: employee.employeeEmail,
+          assignedAt: new Date(),
+        })
+      }
+    }
+  }
+
+  return assignees
+}
+
 // ==================== Onboarding Services ====================
 
 export async function getOnboarding(candidateId: number): Promise<OnboardingWithRelations | null> {
@@ -1010,6 +1138,61 @@ export async function deleteProgram(programId: number): Promise<void> {
   if (result.isFailure()) {
     throw new Error(result.error)
   }
+}
+
+// ==================== Send Onboarding Email ====================
+
+// Format snake_case to Title Case
+function formatJobPlacement(value: string): string {
+  if (!value) return ''
+  return value
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
+export async function sendOnboardingEmail(candidateId: number, portalBaseUrl: string): Promise<void> {
+  // Get candidate data
+  const candidateResult = await candidateRepository.findById(candidateId)
+  if (candidateResult.isFailure()) {
+    throw new Error(candidateResult.error)
+  }
+
+  const candidate = candidateResult.getValue()
+  if (!candidate) {
+    throw new NotFoundError('Candidate not found')
+  }
+
+  // Get onboarding data
+  const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+  if (onboardingResult.isFailure()) {
+    throw new Error(onboardingResult.error)
+  }
+
+  const onboarding = onboardingResult.getValue()
+  if (!onboarding) {
+    throw new BadRequestError('Onboarding data not found. Please complete onboarding form first.')
+  }
+
+  // Get job title
+  const jobTitle = candidate.jobTitle?.name || 'Position'
+
+  // Format join date - assuming it's stored somewhere (you may need to add this field)
+  // For now, using current date + 14 days as placeholder if not set
+  const workLocation = formatJobPlacement(onboarding.job_placement || '')
+
+  // Portal URL for candidate to confirm
+  const portalUrl = `${portalBaseUrl}/candidate-portal/onboarding`
+
+  // Send email
+  await sendOnboardingEmailToCandidate({
+    candidateName: candidate.fullname,
+    candidateEmail: candidate.email,
+    jobTitle,
+    workLocation,
+    joinDate: 'To be confirmed', // This should come from onboarding.join_date field
+    portalUrl,
+  })
 }
 
 // ==================== Convert to Employee ====================

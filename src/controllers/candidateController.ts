@@ -61,6 +61,7 @@ type InterviewUpdateBody = AssessmentUpdateBody & {
   key_competencies?: string | null
   interviewer_notes?: string | null
   assessed_by?: string | null
+  assessor_ids?: number[]
 }
 
 type ScoringQuery = {
@@ -141,7 +142,8 @@ function transformCandidate(candidate: CandidateWithDetail) {
     } : null,
     employee_request: candidate.employeeRequest ? {
       id: Number(candidate.employeeRequest.id),
-      code: candidate.employeeRequest.code
+      code: candidate.employeeRequest.code,
+      job_placement: candidate.employeeRequest.jobPlacement
     } : null
   }
 }
@@ -344,7 +346,7 @@ export async function updateInterview1(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { status, description, scoring, conclusion, key_competencies, interviewer_notes, assessed_by } = request.body
+  const { status, description, scoring, conclusion, key_competencies, interviewer_notes, assessed_by, assessor_ids } = request.body
 
   const scoringPayload = scoring && conclusion ? {
     scoring: {
@@ -361,6 +363,7 @@ export async function updateInterview1(
     keyCompetencies: key_competencies,
     interviewerNotes: interviewer_notes,
     assessedBy: assessed_by,
+    assessorIds: assessor_ids,
   } : undefined
 
   const progress = await candidateService.updateInterview1(id, status as AssessmentStatus, description, scoringPayload)
@@ -517,6 +520,17 @@ export async function getAssessmentScoring(
   sendSuccess(reply, scoring)
 }
 
+export async function getAssessmentAssignees(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const assignees = await candidateService.getAssessmentAssignees(id)
+
+  sendSuccess(reply, assignees)
+}
+
 // ==================== Onboarding Endpoints ====================
 
 export async function getOnboarding(
@@ -595,6 +609,18 @@ export async function updateOnboarding(
     document: onboarding.document,
     document_candidate: onboarding.document_candidate
   }, 'Onboarding updated successfully')
+}
+
+export async function sendOnboarding(
+  request: FastifyRequest<{ Params: IdParam; Body: { portal_base_url: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+  const { portal_base_url } = request.body
+
+  await candidateService.sendOnboardingEmail(id, portal_base_url)
+
+  sendSuccess(reply, { success: true }, 'Onboarding email sent successfully')
 }
 
 // ==================== Facility Endpoints ====================

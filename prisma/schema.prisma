@@ -386,7 +386,8 @@ model candidate_recruitment_assessment {
   mcu_document_url              String?          @map("mcu_document_url") @db.VarChar(500)
   mcu_document_name             String?          @map("mcu_document_name") @db.VarChar(255)
 
-  scoring candidate_assessment_scoring[]
+  scoring   candidate_assessment_scoring[]
+  assignees candidate_assessment_assignee[]
 
   @@map("candidate_recruitment_assessment")
 }
@@ -439,6 +440,21 @@ model candidate_assessment_scoring {
   @@index([conclusion])
   @@index([total_score])
   @@map("candidate_assessment_scoring")
+}
+
+// Junction table for multiple assessors assigned to an assessment
+model candidate_assessment_assignee {
+  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  assessment_id BigInt   @db.UnsignedBigInt
+  employee_id   Int      @db.UnsignedInt
+  assigned_at   DateTime @default(now()) @db.Timestamp(0)
+
+  assessment candidate_recruitment_assessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+
+  @@unique([assessment_id, employee_id])
+  @@index([assessment_id])
+  @@index([employee_id])
+  @@map("candidate_assessment_assignee")
 }
 
 model candidate_recruitment_onboarding {

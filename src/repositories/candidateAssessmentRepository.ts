@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import type { candidate_recruitment_assessment, candidate_assessment_scoring } from '@prisma/client'
+import type { candidate_recruitment_assessment, candidate_assessment_scoring, candidate_assessment_assignee } from '@prisma/client'
 
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
@@ -561,6 +561,128 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get assessment progress'
+    return failure(message)
+  }
+}
+
+// ==================== Assignee Management ====================
+
+/**
+ * Set assessor assignees for an assessment (replaces existing)
+ */
+export async function setAssignees(
+  assessmentId: bigint,
+  employeeIds: number[]
+): Promise<RepositoryResult<candidate_assessment_assignee[]>> {
+  try {
+    // Delete existing assignees
+    await prisma.candidate_assessment_assignee.deleteMany({
+      where: { assessment_id: assessmentId }
+    })
+
+    // Create new assignees
+    if (employeeIds.length > 0) {
+      await prisma.candidate_assessment_assignee.createMany({
+        data: employeeIds.map(employeeId => ({
+          assessment_id: assessmentId,
+          employee_id: employeeId,
+        }))
+      })
+    }
+
+    // Fetch and return the created assignees
+    const assignees = await prisma.candidate_assessment_assignee.findMany({
+      where: { assessment_id: assessmentId }
+    })
+
+    return success(assignees)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to set assignees'
+    return failure(message)
+  }
+}
+
+/**
+ * Get all assignees for an assessment
+ */
+export async function getAssignees(
+  assessmentId: bigint
+): Promise<RepositoryResult<candidate_assessment_assignee[]>> {
+  try {
+    const assignees = await prisma.candidate_assessment_assignee.findMany({
+      where: { assessment_id: assessmentId }
+    })
+    return success(assignees)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get assignees'
+    return failure(message)
+  }
+}
+
+/**
+ * Get assignees by candidate ID
+ */
+export async function getAssigneesByCandidateId(
+  candidateId: number
+): Promise<RepositoryResult<number[]>> {
+  try {
+    const assessment = await prisma.candidate_recruitment_assessment.findFirst({
+      where: { candidate_id: candidateId },
+      include: { assignees: true }
+    })
+
+    if (!assessment) {
+      return success([])
+    }
+
+    const employeeIds = assessment.assignees.map(a => a.employee_id)
+    return success(employeeIds)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get assignees'
+    return failure(message)
+  }
+}
+
+/**
+ * Add a single assignee to an assessment
+ */
+export async function addAssignee(
+  assessmentId: bigint,
+  employeeId: number
+): Promise<RepositoryResult<candidate_assessment_assignee>> {
+  try {
+    const assignee = await prisma.candidate_assessment_assignee.create({
+      data: {
+        assessment_id: assessmentId,
+        employee_id: employeeId,
+      }
+    })
+    return success(assignee)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to add assignee'
+    return failure(message)
+  }
+}
+
+/**
+ * Remove a single assignee from an assessment
+ */
+export async function removeAssignee(
+  assessmentId: bigint,
+  employeeId: number
+): Promise<RepositoryResult<boolean>> {
+  try {
+    await prisma.candidate_assessment_assignee.delete({
+      where: {
+        assessment_id_employee_id: {
+          assessment_id: assessmentId,
+          employee_id: employeeId,
+        }
+      }
+    })
+    return success(true)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove assignee'
     return failure(message)
   }
 }
