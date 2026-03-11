@@ -61,9 +61,10 @@ export type PaginatedResult = {
 
 export type EmployeeRequestWithRelations = EmployeeRequest & {
   jobTitle?: { id: bigint; name: string } | null
+  department?: { id: number; name: string; code: string } | null
   createdByUser?: { id: number; name: string | null; email: string; displayName: string } | null
   comments?: (EmployeeRequestComment & {
-    user?: { id: number; name: string | null; displayName: string } | null
+    user?: { id: number; name: string | null; displayName: string; role?: { roleName: string | null } | null } | null
   })[]
 }
 
@@ -124,13 +125,26 @@ async function fetchJobTitle(jobTitleId: number): Promise<{ id: bigint; name: st
   return jobTitle
 }
 
+// Helper to fetch the first department associated with a job title via pivot table
+async function fetchDepartmentByJobTitle(jobTitleId: number): Promise<{ id: number; name: string; code: string } | null> {
+  const pivot = await prisma.departmentJobTitle.findFirst({
+    where: { jobTitleId: BigInt(jobTitleId) },
+    include: {
+      department: {
+        select: { id: true, name: true, code: true }
+      }
+    }
+  })
+  return pivot?.department ?? null
+}
+
 // Helper to fetch comments for an employee request
-async function fetchComments(employeeRequestId: number): Promise<(EmployeeRequestComment & { user?: { id: number; name: string | null; displayName: string } | null })[]> {
+async function fetchComments(employeeRequestId: number): Promise<(EmployeeRequestComment & { user?: { id: number; name: string | null; displayName: string; role?: { roleName: string | null } | null } | null })[]> {
   const comments = await prisma.employeeRequestComment.findMany({
     where: { employeeRequestId },
     include: {
       user: {
-        select: { id: true, name: true, displayName: true }
+        select: { id: true, name: true, displayName: true, role: { select: { roleName: true } } }
       }
     },
     orderBy: { createdAt: 'desc' }
@@ -196,11 +210,14 @@ export async function findAll(
       prisma.employeeRequest.count({ where })
     ])
 
-    // Enrich with job titles
+    // Enrich with job titles and departments
     const items: EmployeeRequestWithRelations[] = await Promise.all(
       rawItems.map(async (item: EmployeeRequest & { createdByUser?: { id: number; name: string | null; email: string; displayName: string } | null }) => {
-        const jobTitle = await fetchJobTitle(item.jobTitleId)
-        return { ...item, jobTitle } as EmployeeRequestWithRelations
+        const [jobTitle, department] = await Promise.all([
+          fetchJobTitle(item.jobTitleId),
+          fetchDepartmentByJobTitle(item.jobTitleId)
+        ])
+        return { ...item, jobTitle, department } as EmployeeRequestWithRelations
       })
     )
 
@@ -222,13 +239,14 @@ export async function findById(id: number): Promise<RepositoryResult<EmployeeReq
       return success(null)
     }
 
-    // Enrich with job title and comments
-    const [jobTitle, comments] = await Promise.all([
+    // Enrich with job title, department, and comments
+    const [jobTitle, department, comments] = await Promise.all([
       fetchJobTitle(employeeRequest.jobTitleId),
+      fetchDepartmentByJobTitle(employeeRequest.jobTitleId),
       fetchComments(Number(employeeRequest.id))
     ])
 
-    return success({ ...employeeRequest, jobTitle, comments } as EmployeeRequestWithRelations)
+    return success({ ...employeeRequest, jobTitle, department, comments } as EmployeeRequestWithRelations)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to find employee request by id'
     return failure(message)
@@ -268,10 +286,13 @@ export async function create(data: CreateEmployeeRequestData): Promise<Repositor
       include: includeRelations
     })
 
-    // Enrich with job title
-    const jobTitle = await fetchJobTitle(employeeRequest.jobTitleId)
+    // Enrich with job title and department
+    const [jobTitle, department] = await Promise.all([
+      fetchJobTitle(employeeRequest.jobTitleId),
+      fetchDepartmentByJobTitle(employeeRequest.jobTitleId)
+    ])
 
-    return success({ ...employeeRequest, jobTitle, comments: [] } as EmployeeRequestWithRelations)
+    return success({ ...employeeRequest, jobTitle, department, comments: [] } as EmployeeRequestWithRelations)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create employee request'
     return failure(message)
@@ -311,13 +332,14 @@ export async function update(id: number, data: UpdateEmployeeRequestData): Promi
       include: includeRelations
     })
 
-    // Enrich with job title and comments
-    const [jobTitle, comments] = await Promise.all([
+    // Enrich with job title, department, and comments
+    const [jobTitle, department, comments] = await Promise.all([
       fetchJobTitle(employeeRequest.jobTitleId),
+      fetchDepartmentByJobTitle(employeeRequest.jobTitleId),
       fetchComments(Number(employeeRequest.id))
     ])
 
-    return success({ ...employeeRequest, jobTitle, comments } as EmployeeRequestWithRelations)
+    return success({ ...employeeRequest, jobTitle, department, comments } as EmployeeRequestWithRelations)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update employee request'
     return failure(message)
@@ -343,7 +365,7 @@ export async function addComment(
     userId: number
     comment: string
   }
-): Promise<RepositoryResult<EmployeeRequestComment & { user?: { id: number; name: string | null; displayName: string } | null }>> {
+): Promise<RepositoryResult<EmployeeRequestComment & { user?: { id: number; name: string | null; displayName: string; role?: { roleName: string | null } | null } | null }>> {
   try {
     const commentData = await prisma.employeeRequestComment.create({
       data: {
@@ -353,7 +375,7 @@ export async function addComment(
       },
       include: {
         user: {
-          select: { id: true, name: true, displayName: true }
+          select: { id: true, name: true, displayName: true, role: { select: { roleName: true } } }
         }
       }
     })

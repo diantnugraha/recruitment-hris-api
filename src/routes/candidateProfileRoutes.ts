@@ -330,6 +330,7 @@ export async function candidateProfileRoutes(app: FastifyInstance): Promise<void
                 pic: Type.String(),
                 status: Type.String()
               })),
+              onboarding_accepted_at: Type.Union([Type.String(), Type.Null()]),
               created_at: Type.Union([Type.String(), Type.Null()]),
               updated_at: Type.Union([Type.String(), Type.Null()])
             }),

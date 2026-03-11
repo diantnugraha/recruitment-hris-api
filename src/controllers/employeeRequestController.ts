@@ -50,6 +50,11 @@ function transformEmployeeRequest(request: EmployeeRequestWithRelations) {
       id: Number(request.jobTitle.id),
       name: request.jobTitle.name
     } : null,
+    department: request.department ? {
+      id: request.department.id,
+      name: request.department.name,
+      code: request.department.code
+    } : null,
     requested_by: request.createdByUser ? {
       id: request.createdByUser.id,
       name: request.createdByUser.name,
@@ -63,12 +68,13 @@ function transformEmployeeRequest(request: EmployeeRequestWithRelations) {
       comment: string
       createdAt: Date | null
       updatedAt: Date | null
-      user?: { id: number; name: string | null; displayName: string } | null
+      user?: { id: number; name: string | null; displayName: string; role?: { roleName: string | null } | null } | null
     }) => ({
       id: Number(c.id),
       employee_request_id: c.employeeRequestId,
       user_id: c.userId,
       user_name: c.user?.displayName || c.user?.name,
+      user_role: c.user?.role?.roleName || null,
       comment: c.comment,
       created_at: c.createdAt?.toISOString() || null
     }))
@@ -203,6 +209,7 @@ export async function addComment(
     employee_request_id: commentData.employeeRequestId,
     user_id: commentData.userId,
     user_name: commentData.user?.displayName || commentData.user?.name,
+    user_role: commentData.user?.role?.roleName || null,
     comment: commentData.comment,
     created_at: commentData.createdAt?.toISOString() || null
   }, 'Comment added successfully', 201)

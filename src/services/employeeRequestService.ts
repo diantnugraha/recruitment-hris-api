@@ -216,7 +216,7 @@ export async function addComment(
   userId: number
   createdAt: Date | null
   updatedAt: Date | null
-  user?: { id: number; name: string | null; displayName: string } | null
+  user?: { id: number; name: string | null; displayName: string; role?: { roleName: string | null } | null } | null
 }> {
   // Check if employee request exists
   const existingResult = await employeeRequestRepository.findById(id)

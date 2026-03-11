@@ -420,6 +420,7 @@ export async function getOnboarding(
         pic: p.pic,
         status: p.status
       })),
+      onboarding_accepted_at: onboarding.onboardingAcceptedAt?.toISOString() || null,
       created_at: onboarding.createdAt?.toISOString() || null,
       updated_at: onboarding.updatedAt?.toISOString() || null
     })
