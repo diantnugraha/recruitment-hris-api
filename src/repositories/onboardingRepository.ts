@@ -386,6 +386,32 @@ export async function countProgramsByOnboardingId(onboardingId: number): Promise
   }
 }
 
+// Accept onboarding - set onboarding_accepted_at timestamp
+export async function acceptOnboarding(candidateId: number): Promise<RepositoryResult<candidate_recruitment_onboarding>> {
+  try {
+    const onboarding = await prisma.candidate_recruitment_onboarding.findFirst({
+      where: { candidate_id: candidateId }
+    })
+
+    if (!onboarding) {
+      return failure('Onboarding not found for this candidate')
+    }
+
+    const updated = await prisma.candidate_recruitment_onboarding.update({
+      where: { id: onboarding.id },
+      data: {
+        onboardingAcceptedAt: new Date(),
+        updatedAt: new Date()
+      }
+    })
+
+    return success(updated)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to accept onboarding'
+    return failure(message)
+  }
+}
+
 // Check if onboarding is complete (has job placement, at least 1 facility, at least 1 program)
 export async function isOnboardingComplete(candidateId: number): Promise<RepositoryResult<boolean>> {
   try {

@@ -474,6 +474,7 @@ model candidate_recruitment_onboarding {
   createdAt                     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt                     DateTime? @map("updated_at") @db.Timestamp(0)
   document_candidate            String    @db.Text
+  onboardingAcceptedAt          DateTime? @map("onboarding_accepted_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_onboarding")
 }

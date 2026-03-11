@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify'
 import type { CandidateRecruitment } from '@prisma/client'
 
 import * as candidateAuthService from '../services/candidateAuthService.js'
+import * as candidateService from '../services/candidateService.js'
 import { successResponse } from '../utils/response.js'
 import type { CandidateLoginBody, CandidateProfileUpdate } from '../schemas/candidateAuthSchemas.js'
 import { UnauthorizedError } from '../errors/index.js'
@@ -121,5 +122,45 @@ export async function acceptAgreement(
 
   return reply.status(200).send(
     successResponse(transformCandidate({ ...candidate, candidateCode: undefined }))
+  )
+}
+
+export async function acceptOnboarding(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.candidate) {
+    throw new UnauthorizedError('Not authenticated')
+  }
+
+  const onboarding = await candidateService.acceptOnboarding(request.candidate.candidateId)
+
+  return reply.status(200).send(
+    successResponse({
+      id: Number(onboarding.id),
+      candidateId: onboarding.candidate_id,
+      employeeRequestId: onboarding.employee_request_id,
+      jobPlacement: onboarding.job_placement,
+      document: onboarding.document,
+      documentCandidate: onboarding.document_candidate,
+      onboardingAcceptedAt: onboarding.onboardingAcceptedAt?.toISOString() || null,
+      facilities: onboarding.facilities?.map(f => ({
+        id: Number(f.id),
+        inventoryNo: f.inventory_no,
+        item: f.item,
+        qty: f.qty,
+        unit: f.unit,
+        condition: f.condition,
+        status: f.status
+      })) || [],
+      programs: onboarding.programs?.map(p => ({
+        id: Number(p.id),
+        program: p.program,
+        date: p.date,
+        location: p.location,
+        pic: p.pic,
+        status: p.status
+      })) || []
+    })
   )
 }

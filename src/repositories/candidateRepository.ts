@@ -21,6 +21,9 @@ export type PaginationParams = {
 export type CandidateWithDetail = CandidateRecruitment & {
   detail?: candidate_recruitment_detail | null | undefined
   assessment?: candidate_recruitment_assessment | null | undefined
+  onboarding?: {
+    onboardingAcceptedAt: Date | null
+  } | null | undefined
   jobTitle?: {
     id: bigint
     name: string
@@ -304,12 +307,19 @@ export async function findByEmployeeRequestId(
           select: { id: true, code: true, jobTitleId: true, jobPlacement: true }
         })
 
+        // Fetch onboarding data to get onboardingAcceptedAt
+        const onboarding = await prisma.candidate_recruitment_onboarding.findFirst({
+          where: { candidate_id: Number(candidate.id) },
+          select: { onboardingAcceptedAt: true }
+        })
+
         return {
           ...candidate,
           detail,
           assessment,
           jobTitle,
-          employeeRequest
+          employeeRequest,
+          onboarding
         } as CandidateWithDetail
       })
     )

@@ -8,6 +8,7 @@ import * as candidateDetailRepository from '../repositories/candidateDetailRepos
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
 import * as employeeRepository from '../repositories/employeeRepository.js'
+import * as employeeRequestRepository from '../repositories/employeeRequestRepository.js'
 
 // Generate random 8-character password (alphanumeric)
 function generateRandomPassword(): string {
@@ -1216,6 +1217,50 @@ export async function sendOnboardingEmail(candidateId: number, portalBaseUrl: st
     joinDate: 'To be confirmed', // This should come from onboarding.join_date field
     portalUrl,
   })
+}
+
+// ==================== Accept Onboarding ====================
+
+export async function acceptOnboarding(candidateId: number): Promise<OnboardingWithRelations> {
+  // Check if onboarding exists
+  const existingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+  if (existingResult.isFailure()) {
+    throw new Error(existingResult.error)
+  }
+
+  const existing = existingResult.getValue()
+  if (!existing) {
+    throw new NotFoundError('Onboarding not found for this candidate')
+  }
+
+  // Check if already accepted
+  if (existing.onboardingAcceptedAt) {
+    throw new BadRequestError('Onboarding has already been accepted')
+  }
+
+  // Accept onboarding
+  const acceptResult = await onboardingRepository.acceptOnboarding(candidateId)
+  if (acceptResult.isFailure()) {
+    throw new Error(acceptResult.error)
+  }
+
+  // Update employee request status to completed (7)
+  const employeeRequestId = existing.employee_request_id
+  const updateResult = await employeeRequestRepository.update(employeeRequestId, {
+    statusEmployeeRequest: 7 // completed
+  })
+  if (updateResult.isFailure()) {
+    console.error('Failed to update employee request status:', updateResult.error)
+    // Don't throw - onboarding acceptance is more important
+  }
+
+  // Fetch with relations
+  const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+  if (onboardingResult.isFailure()) {
+    throw new Error(onboardingResult.error)
+  }
+
+  return onboardingResult.getValue()!
 }
 
 // ==================== Convert to Employee ====================

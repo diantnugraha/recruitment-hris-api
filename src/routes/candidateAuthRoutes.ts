@@ -102,4 +102,46 @@ export async function candidateAuthRoutes(app: FastifyInstance): Promise<void> {
     preHandler: authenticateCandidate,
     handler: candidateAuthController.acceptAgreement
   })
+
+  // POST /v1/candidate-auth/accept-onboarding - Accept onboarding offer
+  app.post('/accept-onboarding', {
+    schema: {
+      tags: ['Candidate Auth'],
+      summary: 'Accept onboarding offer (requires auth)',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            id: Type.Number(),
+            candidateId: Type.Number(),
+            employeeRequestId: Type.Number(),
+            jobPlacement: Type.String(),
+            document: Type.String(),
+            documentCandidate: Type.String(),
+            onboardingAcceptedAt: Type.Union([Type.String(), Type.Null()]),
+            facilities: Type.Array(Type.Object({
+              id: Type.Number(),
+              inventoryNo: Type.String(),
+              item: Type.String(),
+              qty: Type.Number(),
+              unit: Type.String(),
+              condition: Type.String(),
+              status: Type.String()
+            })),
+            programs: Type.Array(Type.Object({
+              id: Type.Number(),
+              program: Type.String(),
+              date: Type.String(),
+              location: Type.String(),
+              pic: Type.String(),
+              status: Type.String()
+            }))
+          })
+        })
+      }
+    },
+    preHandler: authenticateCandidate,
+    handler: candidateAuthController.acceptOnboarding
+  })
 }

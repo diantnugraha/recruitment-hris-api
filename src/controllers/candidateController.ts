@@ -145,7 +145,8 @@ function transformCandidate(candidate: CandidateWithDetail) {
       id: Number(candidate.employeeRequest.id),
       code: candidate.employeeRequest.code,
       job_placement: candidate.employeeRequest.jobPlacement
-    } : null
+    } : null,
+    onboarding_accepted_at: candidate.onboarding?.onboardingAcceptedAt?.toISOString() || null
   }
 }
 
@@ -555,6 +556,7 @@ export async function getOnboarding(
     job_placement: onboarding.job_placement,
     document: onboarding.document,
     document_candidate: onboarding.document_candidate,
+    onboarding_accepted_at: onboarding.onboardingAcceptedAt?.toISOString() || null,
     facilities: onboarding.facilities?.map(f => ({
       id: Number(f.id),
       inventory_no: f.inventory_no,
