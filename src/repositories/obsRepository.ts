@@ -3,10 +3,13 @@ import type { Obs, Prisma } from '@prisma/client'
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
 
+export type ObsWithRelations = Obs & {
+  _count?: { divisions: number }
+}
+
 export type ObsFilters = {
   name?: string
-  cluster?: string
-  description?: string
+  code?: string
 }
 
 export type PaginationParams = {
@@ -15,21 +18,25 @@ export type PaginationParams = {
 }
 
 export type PaginatedResult = {
-  items: Obs[]
+  items: ObsWithRelations[]
   total: number
 }
 
 export type CreateObsData = {
   name: string
-  cluster?: string
+  code?: string
   description?: string
 }
 
 export type UpdateObsData = {
-  name: string
-  cluster?: string
+  name?: string
+  code?: string
   description?: string
 }
+
+const obsInclude = {
+  _count: { select: { divisions: true } }
+} as const
 
 export async function findAll(
   filters: ObsFilters,
@@ -38,13 +45,13 @@ export async function findAll(
   try {
     const where: Prisma.ObsWhereInput = {
       ...(filters.name && { name: { contains: filters.name } }),
-      ...(filters.cluster && { cluster: { contains: filters.cluster } }),
-      ...(filters.description && { description: { contains: filters.description } })
+      ...(filters.code && { code: { contains: filters.code } })
     }
 
     const [items, total] = await prisma.$transaction([
       prisma.obs.findMany({
         where,
+        include: obsInclude,
         orderBy: { name: 'asc' },
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit
@@ -59,10 +66,11 @@ export async function findAll(
   }
 }
 
-export async function findById(id: number): Promise<RepositoryResult<Obs | null>> {
+export async function findById(id: number): Promise<RepositoryResult<ObsWithRelations | null>> {
   try {
     const obs = await prisma.obs.findUnique({
-      where: { id }
+      where: { id },
+      include: obsInclude
     })
     return success(obs)
   } catch (error) {
@@ -76,8 +84,8 @@ export async function create(data: CreateObsData): Promise<RepositoryResult<Obs>
     const obs = await prisma.obs.create({
       data: {
         name: data.name,
-        cluster: data.cluster,
-        description: data.description
+        ...(data.code !== undefined && { code: data.code }),
+        ...(data.description !== undefined && { description: data.description })
       }
     })
     return success(obs)
@@ -92,9 +100,9 @@ export async function update(id: number, data: UpdateObsData): Promise<Repositor
     const obs = await prisma.obs.update({
       where: { id },
       data: {
-        name: data.name,
-        cluster: data.cluster,
-        description: data.description,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.code !== undefined && { code: data.code }),
+        ...(data.description !== undefined && { description: data.description }),
         updatedAt: new Date()
       }
     })
@@ -146,14 +154,14 @@ export async function nameExistsExcept(name: string, exceptId: number): Promise<
   }
 }
 
-export async function hasDepartments(id: number): Promise<RepositoryResult<boolean>> {
+export async function hasDivisions(id: number): Promise<RepositoryResult<boolean>> {
   try {
-    const count = await prisma.department.count({
+    const count = await prisma.division.count({
       where: { obsId: id }
     })
     return success(count > 0)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to check departments'
+    const message = error instanceof Error ? error.message : 'Failed to check divisions'
     return failure(message)
   }
 }

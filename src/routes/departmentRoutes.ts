@@ -7,9 +7,11 @@ import {
   DepartmentQuerySchema,
   CreateDepartmentBodySchema,
   UpdateDepartmentBodySchema,
+  AssignManagerBodySchema,
   type DepartmentQuery,
   type CreateDepartmentBody,
-  type UpdateDepartmentBody
+  type UpdateDepartmentBody,
+  type AssignManagerBody
 } from '../schemas/departmentSchemas.js'
 
 export async function departmentRoutes(app: FastifyInstance): Promise<void> {
@@ -48,5 +50,24 @@ export async function departmentRoutes(app: FastifyInstance): Promise<void> {
     '/:id',
     { schema: { params: IdParamSchema } },
     departmentController.remove
+  )
+
+  // Assign Manager
+  app.put<{ Params: IdParam; Body: AssignManagerBody }>(
+    '/:id/manager',
+    {
+      schema: {
+        params: IdParamSchema,
+        body: AssignManagerBodySchema
+      }
+    },
+    departmentController.assignManager
+  )
+
+  // Remove Manager
+  app.delete<{ Params: IdParam }>(
+    '/:id/manager',
+    { schema: { params: IdParamSchema } },
+    departmentController.removeManager
   )
 }

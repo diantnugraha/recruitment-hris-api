@@ -7,13 +7,18 @@ import {
   DivisionQuerySchema,
   CreateDivisionBodySchema,
   UpdateDivisionBodySchema,
+  AssignHeadBodySchema,
   type DivisionQuery,
   type CreateDivisionBody,
-  type UpdateDivisionBody
+  type UpdateDivisionBody,
+  type AssignHeadBody
 } from '../schemas/divisionSchemas.js'
 
 export async function divisionRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authenticate)
+
+  // Get all management divisions (BOD level)
+  app.get('/management', divisionController.getManagement)
 
   app.get<{ Querystring: DivisionQuery }>(
     '/',
@@ -48,5 +53,43 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
     '/:id',
     { schema: { params: IdParamSchema } },
     divisionController.remove
+  )
+
+  // Assign Head of Division
+  app.put<{ Params: IdParam; Body: AssignHeadBody }>(
+    '/:id/head',
+    {
+      schema: {
+        params: IdParamSchema,
+        body: AssignHeadBodySchema
+      }
+    },
+    divisionController.assignHead
+  )
+
+  // Remove Head of Division
+  app.delete<{ Params: IdParam }>(
+    '/:id/head',
+    { schema: { params: IdParamSchema } },
+    divisionController.removeHead
+  )
+
+  // Assign Deputy Head
+  app.put<{ Params: IdParam; Body: AssignHeadBody }>(
+    '/:id/deputy',
+    {
+      schema: {
+        params: IdParamSchema,
+        body: AssignHeadBodySchema
+      }
+    },
+    divisionController.assignDeputy
+  )
+
+  // Remove Deputy Head
+  app.delete<{ Params: IdParam }>(
+    '/:id/deputy',
+    { schema: { params: IdParamSchema } },
+    divisionController.removeDeputy
   )
 }

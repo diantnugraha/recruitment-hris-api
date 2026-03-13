@@ -1,7 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
-import type { DivisionQuery, CreateDivisionBody, UpdateDivisionBody } from '../schemas/divisionSchemas.js'
+import type {
+  DivisionQuery,
+  CreateDivisionBody,
+  UpdateDivisionBody,
+  AssignHeadBody
+} from '../schemas/divisionSchemas.js'
 import * as divisionService from '../services/divisionService.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
 
@@ -9,12 +14,13 @@ export async function getAll(
   request: FastifyRequest<{ Querystring: DivisionQuery }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { page = 1, limit = 20, name, code, description } = request.query
+  const { page = 1, limit = 20, name, code, obs_id, is_management } = request.query
 
   const filters = {
     ...(name && { name }),
     ...(code && { code }),
-    ...(description && { description })
+    ...(obs_id && { obsId: obs_id }),
+    ...(is_management !== undefined && { isManagement: is_management })
   }
 
   const pagination = { page, limit }
@@ -41,10 +47,16 @@ export async function create(
   request: FastifyRequest<{ Body: CreateDivisionBody }>,
   reply: FastifyReply
 ): Promise<void> {
+  const { name, code, obsId, isManagement, headOfDivisionId, deputyHeadId, description } = request.body
+
   const data = {
-    name: request.body.name,
-    code: request.body.code,
-    description: request.body.description
+    name,
+    ...(code && { code }),
+    ...(obsId && { obsId }),
+    ...(isManagement !== undefined && { isManagement }),
+    ...(headOfDivisionId && { headOfDivisionId }),
+    ...(deputyHeadId && { deputyHeadId }),
+    ...(description && { description })
   }
 
   const division = await divisionService.createDivision(data)
@@ -57,10 +69,16 @@ export async function update(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
+  const { name, code, obsId, isManagement, headOfDivisionId, deputyHeadId, description } = request.body
+
   const data = {
-    name: request.body.name,
-    code: request.body.code,
-    description: request.body.description
+    ...(name && { name }),
+    ...(code !== undefined && { code }),
+    ...(obsId !== undefined && { obsId }),
+    ...(isManagement !== undefined && { isManagement }),
+    ...(headOfDivisionId !== undefined && { headOfDivisionId }),
+    ...(deputyHeadId !== undefined && { deputyHeadId }),
+    ...(description !== undefined && { description })
   }
 
   const division = await divisionService.updateDivision(id, data)
@@ -77,4 +95,59 @@ export async function remove(
   await divisionService.deleteDivision(id)
 
   reply.status(204).send()
+}
+
+export async function assignHead(
+  request: FastifyRequest<{ Params: IdParam; Body: AssignHeadBody }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+  const { employeeId } = request.body
+
+  const division = await divisionService.assignHeadOfDivision(id, employeeId)
+
+  sendSuccess(reply, division, 'Head of division assigned successfully')
+}
+
+export async function removeHead(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const division = await divisionService.removeHeadOfDivision(id)
+
+  sendSuccess(reply, division, 'Head of division removed successfully')
+}
+
+export async function assignDeputy(
+  request: FastifyRequest<{ Params: IdParam; Body: AssignHeadBody }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+  const { employeeId } = request.body
+
+  const division = await divisionService.assignDeputyHead(id, employeeId)
+
+  sendSuccess(reply, division, 'Deputy head assigned successfully')
+}
+
+export async function removeDeputy(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const division = await divisionService.removeDeputyHead(id)
+
+  sendSuccess(reply, division, 'Deputy head removed successfully')
+}
+
+export async function getManagement(
+  _request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const divisions = await divisionService.getManagementDivisions()
+
+  sendSuccess(reply, divisions)
 }

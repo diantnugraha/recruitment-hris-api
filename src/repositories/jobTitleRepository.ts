@@ -8,6 +8,7 @@ export type JobTitleWithRelations = JobTitle & {
     id: bigint
     name: string
     category: string
+    code: string | null
   }
   division: {
     id: number
@@ -21,6 +22,7 @@ export type JobTitleWithRelations = JobTitle & {
       id: bigint
       name: string
       category: string
+      code: string | null
     }
   } | null
   departments: Array<{
@@ -28,11 +30,11 @@ export type JobTitleWithRelations = JobTitle & {
       id: number
       name: string
       code: string
-      obs: {
+      division: {
         id: number
         name: string
-        cluster: string | null
-      }
+        code: string | null
+      } | null
     }
   }>
 }
@@ -133,7 +135,8 @@ const includeRelations = {
     select: {
       id: true,
       name: true,
-      category: true
+      category: true,
+      code: true
     }
   },
   division: {
@@ -151,7 +154,8 @@ const includeRelations = {
         select: {
           id: true,
           name: true,
-          category: true
+          category: true,
+          code: true
         }
       }
     }
@@ -163,11 +167,11 @@ const includeRelations = {
           id: true,
           name: true,
           code: true,
-          obs: {
+          division: {
             select: {
               id: true,
               name: true,
-              cluster: true
+              code: true
             }
           }
         }

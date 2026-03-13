@@ -1,20 +1,18 @@
-import { departments_category } from '@prisma/client'
-
-export const DEPARTMENT_CATEGORY = {
-  NON_PROFIT_CENTER: 'Non Profit Center',
-  PROFIT_CENTER: 'Profit Center'
+export const DEPARTMENT_ERROR_MESSAGES = {
+  NOT_FOUND: 'Department not found',
+  NAME_EXISTS: 'Department with this name already exists',
+  CODE_EXISTS: 'Department with this code already exists',
+  DIVISION_NOT_FOUND: 'Division not found',
+  HAS_EMPLOYEES: 'Cannot delete department with existing employees',
+  HAS_JOB_TITLES: 'Cannot delete department with existing job titles',
+  INVALID_MANAGER: 'Invalid manager employee',
+  MANAGER_ALREADY_ASSIGNED: 'This employee is already assigned as manager of another department'
 } as const
 
-export type DepartmentCategory = typeof DEPARTMENT_CATEGORY[keyof typeof DEPARTMENT_CATEGORY]
-
-export const DEPARTMENT_CATEGORY_VALUES = Object.values(DEPARTMENT_CATEGORY) as [string, ...string[]]
-
-// Map display string to Prisma enum value
-export const CATEGORY_TO_PRISMA: Record<DepartmentCategory, departments_category> = {
-  'Non Profit Center': 'Non_Profit_Center',
-  'Profit Center': 'Profit_Center'
-}
-
-export function toPrismaCategory(category: DepartmentCategory): departments_category {
-  return CATEGORY_TO_PRISMA[category]
-}
+export const DEPARTMENT_SUCCESS_MESSAGES = {
+  CREATED: 'Department created successfully',
+  UPDATED: 'Department updated successfully',
+  DELETED: 'Department deleted successfully',
+  MANAGER_ASSIGNED: 'Manager assigned successfully',
+  MANAGER_REMOVED: 'Manager removed successfully'
+} as const

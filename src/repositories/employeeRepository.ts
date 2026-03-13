@@ -31,6 +31,7 @@ export type CreateEmployeeData = {
   gender?: string
   status?: string
   title?: string
+  departmentId?: number
   location?: string
   businessUnit?: string
   extension?: string
@@ -59,6 +60,7 @@ export type UpdateEmployeeData = {
   gender?: string
   status?: string
   title?: string
+  departmentId?: number | null
   location?: string
   businessUnit?: string
   extension?: string
@@ -161,6 +163,7 @@ export async function create(data: CreateEmployeeData): Promise<RepositoryResult
     if (data.gender !== undefined) createData.employeeGender = data.gender
     if (data.status !== undefined) createData.employeeStatus = data.status
     if (data.title !== undefined) createData.employeeTitle = data.title
+    if (data.departmentId !== undefined) createData.departmentId = data.departmentId
     if (data.location !== undefined) createData.employeeLocation = data.location
     if (data.businessUnit !== undefined) createData.employeeBu = data.businessUnit
     if (data.extension !== undefined) createData.employeeExt = data.extension
@@ -199,6 +202,7 @@ export async function update(id: number, data: UpdateEmployeeData): Promise<Repo
     if (data.gender !== undefined) updateData.employeeGender = data.gender
     if (data.status !== undefined) updateData.employeeStatus = data.status
     if (data.title !== undefined) updateData.employeeTitle = data.title
+    if (data.departmentId !== undefined) updateData.departmentId = data.departmentId
     if (data.location !== undefined) updateData.employeeLocation = data.location
     if (data.businessUnit !== undefined) updateData.employeeBu = data.businessUnit
     if (data.extension !== undefined) updateData.employeeExt = data.extension

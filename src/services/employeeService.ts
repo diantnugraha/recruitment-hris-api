@@ -3,6 +3,7 @@ import type { Employee } from '@prisma/client'
 import { NotFoundError, ConflictError, ValidationError } from '../errors/index.js'
 import * as employeeRepository from '../repositories/employeeRepository.js'
 import type { EmployeeFilters, PaginationParams } from '../repositories/employeeRepository.js'
+import { updateStructuralPosition, clearStructuralPositions } from './organizationService.js'
 
 export type CreateEmployeeServiceData = {
   name: string
@@ -12,6 +13,7 @@ export type CreateEmployeeServiceData = {
   gender?: string
   status?: string
   title?: string
+  departmentId?: number
   location?: string
   businessUnit?: string
   extension?: string
@@ -40,6 +42,7 @@ export type UpdateEmployeeServiceData = {
   gender?: string
   status?: string
   title?: string
+  departmentId?: number | null
   location?: string
   businessUnit?: string
   extension?: string
@@ -139,7 +142,14 @@ export async function createEmployee(data: CreateEmployeeServiceData): Promise<E
     throw new Error(result.error)
   }
 
-  return result.getValue()
+  const employee = result.getValue()
+
+  // Auto-fill structural position (HEAD_OF_DIVISION → Division, MANAGER → Department)
+  if (data.title) {
+    await updateStructuralPosition(employee.employeeId, data.title, data.departmentId)
+  }
+
+  return employee
 }
 
 export async function updateEmployee(id: number, data: UpdateEmployeeServiceData): Promise<Employee> {
@@ -183,13 +193,25 @@ export async function updateEmployee(id: number, data: UpdateEmployeeServiceData
     }
   }
 
+  // If job title is changing, clear old structural positions first
+  if (data.title !== undefined) {
+    await clearStructuralPositions(id)
+  }
+
   const result = await employeeRepository.update(id, data)
 
   if (result.isFailure()) {
     throw new Error(result.error)
   }
 
-  return result.getValue()
+  const employee = result.getValue()
+
+  // Auto-fill structural position (HEAD_OF_DIVISION → Division, MANAGER → Department)
+  if (data.title) {
+    await updateStructuralPosition(id, data.title, data.departmentId)
+  }
+
+  return employee
 }
 
 export async function deleteEmployee(id: number): Promise<void> {

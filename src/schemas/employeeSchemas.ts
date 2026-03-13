@@ -33,7 +33,9 @@ export const EmployeeQuerySchema = Type.Object({
   status: Type.Optional(EmployeeStatusSchema),
   gender: Type.Optional(EmployeeGenderSchema),
   location: Type.Optional(Type.String()),
-  business_unit: Type.Optional(Type.String())
+  business_unit: Type.Optional(Type.String()),
+  department_id: Type.Optional(Type.Integer({ minimum: 1 })),
+  job_title_id: Type.Optional(Type.Integer({ minimum: 1 }))
 })
 
 export type EmployeeQuery = Static<typeof EmployeeQuerySchema>
@@ -63,7 +65,9 @@ export const CreateEmployeeBodySchema = Type.Object({
   spouse_name: Type.Optional(Type.String({ maxLength: 100 })),
   emergency_name: Type.Optional(Type.String({ maxLength: 200 })),
   emergency_relation: Type.Optional(Type.String({ maxLength: 45 })),
-  emergency_phone: Type.Optional(Type.String({ maxLength: 45 }))
+  emergency_phone: Type.Optional(Type.String({ maxLength: 45 })),
+  job_title_id: Type.Optional(Type.Integer({ minimum: 1 })),
+  department_id: Type.Optional(Type.Integer({ minimum: 1 }))
 })
 
 export type CreateEmployeeBody = Static<typeof CreateEmployeeBodySchema>
@@ -93,7 +97,17 @@ export const UpdateEmployeeBodySchema = Type.Object({
   spouse_name: Type.Optional(Type.String({ maxLength: 100 })),
   emergency_name: Type.Optional(Type.String({ maxLength: 200 })),
   emergency_relation: Type.Optional(Type.String({ maxLength: 45 })),
-  emergency_phone: Type.Optional(Type.String({ maxLength: 45 }))
+  emergency_phone: Type.Optional(Type.String({ maxLength: 45 })),
+  job_title_id: Type.Optional(Type.Union([Type.Integer({ minimum: 1 }), Type.Null()])),
+  department_id: Type.Optional(Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]))
 })
 
 export type UpdateEmployeeBody = Static<typeof UpdateEmployeeBodySchema>
+
+// Schema for checking structural position occupancy
+export const CheckStructuralPositionQuerySchema = Type.Object({
+  job_title: Type.String({ minLength: 1 }),
+  department_id: Type.Optional(Type.Integer({ minimum: 1 }))
+})
+
+export type CheckStructuralPositionQuery = Static<typeof CheckStructuralPositionQuerySchema>

@@ -1,8 +1,9 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
-import type { EmployeeQuery, CreateEmployeeBody, UpdateEmployeeBody } from '../schemas/employeeSchemas.js'
+import type { EmployeeQuery, CreateEmployeeBody, UpdateEmployeeBody, CheckStructuralPositionQuery } from '../schemas/employeeSchemas.js'
 import * as employeeService from '../services/employeeService.js'
+import { checkStructuralPositionOccupied } from '../services/organizationService.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
 import { transformEmployees, transformEmployee, type DepartmentInfo } from '../transformers/employeeTransformer.js'
 import { prisma } from '../config/database.js'
@@ -100,6 +101,7 @@ export async function create(
     ...(body.gender !== undefined && { gender: body.gender }),
     ...(body.status !== undefined && { status: body.status }),
     ...(body.title !== undefined && { title: body.title }),
+    ...(body.department_id !== undefined && { departmentId: body.department_id }),
     ...(body.location !== undefined && { location: body.location }),
     ...(body.business_unit !== undefined && { businessUnit: body.business_unit }),
     ...(body.extension !== undefined && { extension: body.extension }),
@@ -140,6 +142,7 @@ export async function update(
     ...(body.gender !== undefined && { gender: body.gender }),
     ...(body.status !== undefined && { status: body.status }),
     ...(body.title !== undefined && { title: body.title }),
+    ...(body.department_id !== undefined && { departmentId: body.department_id }),
     ...(body.location !== undefined && { location: body.location }),
     ...(body.business_unit !== undefined && { businessUnit: body.business_unit }),
     ...(body.extension !== undefined && { extension: body.extension }),
@@ -174,4 +177,19 @@ export async function remove(
   await employeeService.deleteEmployee(id)
 
   reply.status(204).send()
+}
+
+/**
+ * Check if a structural position (HEAD_OF_DIVISION or MANAGER) is currently occupied
+ * Used to show confirmation dialog before replacing current holder
+ */
+export async function checkStructuralPosition(
+  request: FastifyRequest<{ Querystring: CheckStructuralPositionQuery }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { job_title, department_id } = request.query
+
+  const result = await checkStructuralPositionOccupied(job_title, department_id)
+
+  sendSuccess(reply, result)
 }

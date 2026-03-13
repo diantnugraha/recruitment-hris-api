@@ -7,9 +7,11 @@ import {
   EmployeeQuerySchema,
   CreateEmployeeBodySchema,
   UpdateEmployeeBodySchema,
+  CheckStructuralPositionQuerySchema,
   type EmployeeQuery,
   type CreateEmployeeBody,
-  type UpdateEmployeeBody
+  type UpdateEmployeeBody,
+  type CheckStructuralPositionQuery
 } from '../schemas/employeeSchemas.js'
 
 export async function employeeRoutes(app: FastifyInstance): Promise<void> {
@@ -48,5 +50,12 @@ export async function employeeRoutes(app: FastifyInstance): Promise<void> {
     '/:id',
     { schema: { params: IdParamSchema } },
     employeeController.remove
+  )
+
+  // Check if structural position is occupied (for confirmation dialog)
+  app.get<{ Querystring: CheckStructuralPositionQuery }>(
+    '/check-structural-position',
+    { schema: { querystring: CheckStructuralPositionQuerySchema } },
+    employeeController.checkStructuralPosition
   )
 }

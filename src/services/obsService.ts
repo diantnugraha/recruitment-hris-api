@@ -2,22 +2,22 @@ import type { Obs } from '@prisma/client'
 
 import { NotFoundError, ConflictError } from '../errors/index.js'
 import * as obsRepository from '../repositories/obsRepository.js'
-import type { ObsFilters, PaginationParams } from '../repositories/obsRepository.js'
+import type { ObsFilters, PaginationParams, ObsWithRelations } from '../repositories/obsRepository.js'
 
 export type CreateObsServiceData = {
   name: string
-  cluster?: string
+  code?: string
   description?: string
 }
 
 export type UpdateObsServiceData = {
-  name: string
-  cluster?: string
+  name?: string
+  code?: string
   description?: string
 }
 
 export type PaginatedObs = {
-  items: Obs[]
+  items: ObsWithRelations[]
   total: number
 }
 
@@ -34,7 +34,7 @@ export async function getAllObs(
   return result.getValue()
 }
 
-export async function getObsById(id: number): Promise<Obs> {
+export async function getObsById(id: number): Promise<ObsWithRelations> {
   const result = await obsRepository.findById(id)
 
   if (result.isFailure()) {
@@ -81,7 +81,7 @@ export async function updateObs(id: number, data: UpdateObsServiceData): Promise
     throw new NotFoundError('OBS not found')
   }
 
-  if (data.name !== existing.name) {
+  if (data.name && data.name !== existing.name) {
     const nameExistsResult = await obsRepository.nameExistsExcept(data.name, id)
 
     if (nameExistsResult.isFailure()) {
@@ -114,14 +114,14 @@ export async function deleteObs(id: number): Promise<void> {
     throw new NotFoundError('OBS not found')
   }
 
-  const hasDepartmentsResult = await obsRepository.hasDepartments(id)
+  const hasDivisionsResult = await obsRepository.hasDivisions(id)
 
-  if (hasDepartmentsResult.isFailure()) {
-    throw new Error(hasDepartmentsResult.error)
+  if (hasDivisionsResult.isFailure()) {
+    throw new Error(hasDivisionsResult.error)
   }
 
-  if (hasDepartmentsResult.getValue()) {
-    throw new ConflictError('Cannot delete OBS with existing departments')
+  if (hasDivisionsResult.getValue()) {
+    throw new ConflictError('Cannot delete OBS with existing divisions')
   }
 
   const result = await obsRepository.remove(id)

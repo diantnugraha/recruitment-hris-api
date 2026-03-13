@@ -14,7 +14,7 @@ model User {
   password        String    @db.VarChar(255)
   displayName     String    @map("display_name") @db.VarChar(100)
   roleId          Int       @map("role_id")
-  employeeId      Int?      @map("employee_id")
+  employeeId      Int       @unique @map("employee_id")
   superiorId      Int?      @map("superior_id")
   rememberToken   String?   @map("remember_token") @db.VarChar(100)
   emailVerifiedAt DateTime? @map("email_verified_at")
@@ -24,7 +24,7 @@ model User {
   trash           DateTime? @map("deleted_at")
 
   role     Role       @relation(fields: [roleId], references: [roleId])
-  employee Employee?  @relation(fields: [employeeId], references: [employeeId])
+  employee Employee   @relation(fields: [employeeId], references: [employeeId])
   files    UserFile[]
 
   employeeRequests        EmployeeRequest[]
@@ -47,6 +47,8 @@ model Employee {
   employeeId            Int       @id @default(autoincrement()) @map("employee_id")
   uuid                  String?   @unique @db.VarChar(36)
   superiorId            Int?      @map("superior_id")
+  jobTitleId            BigInt?   @map("job_title_id") @db.UnsignedBigInt
+  departmentId          Int?      @map("department_id")
   employeeImages        String?   @map("employee_images") @db.VarChar(255)
   employeeBu            String?   @map("employee_bu") @db.VarChar(100)
   employeeExt           String?   @map("employee_ext") @db.VarChar(50)
@@ -75,18 +77,28 @@ model Employee {
   employeeTrash         Int?      @map("employee_trash")
   employeeSign          String?   @map("employee_sign") @db.VarChar(255)
 
-  users User[]
+  // Relations
+  user       User?
+  jobTitle   JobTitle?   @relation(fields: [jobTitleId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
 
+  // Structural positions (inverse relations)
+  headOfDivisions    Division[]   @relation("HeadOfDivision")
+  deputyOfDivisions  Division[]   @relation("DeputyHead")
+  managedDepartments Department[] @relation("DepartmentManager")
+
+  @@index([jobTitleId])
+  @@index([departmentId])
   @@map("employee_list")
 }
 
 model UserFile {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  name      String   @db.VarChar(255)
-  type      String   @db.VarChar(50)
-  location  String   @db.VarChar(500)
-  createdAt DateTime @default(now()) @map("created_at")
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  name      String    @db.VarChar(255)
+  type      String    @db.VarChar(50)
+  location  String    @db.VarChar(500)
+  createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @map("updated_at")
 
   user User @relation(fields: [userId], references: [id])
@@ -96,55 +108,64 @@ model UserFile {
   @@map("user_files")
 }
 
-// Organizational Breakdown Structure
+// Organizational Breakdown Structure (Business Unit)
 model Obs {
-  id          Int       @id @default(autoincrement())
-  name        String    @db.VarChar(255)
-  cluster     String?   @db.VarChar(100)
-  description String?   @db.Text
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime? @map("updated_at")
-
-  departments Department[]
-
-  @@index([name])
-  @@index([cluster])
-  @@map("obs")
-}
-
-model Division {
-  id          Int       @id @default(autoincrement())
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   name        String    @db.VarChar(255)
   code        String?   @db.VarChar(50)
   description String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
 
-  departments Department[]
-  jobTitles   JobTitle[]
+  divisions Division[]
 
   @@index([name])
   @@index([code])
+  @@map("obs")
+}
+
+model Division {
+  id               Int       @id @default(autoincrement())
+  obsId            BigInt?   @map("obs_id") @db.UnsignedBigInt
+  name             String    @db.VarChar(255)
+  code             String?   @db.VarChar(50)
+  isManagement     Boolean   @default(false) @map("is_management")
+  headOfDivisionId Int?      @unique @map("head_of_division_id")
+  deputyHeadId     Int?      @unique @map("deputy_head_id")
+  description      String?   @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime? @map("updated_at")
+
+  obs            Obs?         @relation(fields: [obsId], references: [id])
+  headOfDivision Employee?    @relation("HeadOfDivision", fields: [headOfDivisionId], references: [employeeId])
+  deputyHead     Employee?    @relation("DeputyHead", fields: [deputyHeadId], references: [employeeId])
+  departments    Department[]
+  jobTitles      JobTitle[]
+
+  @@index([name])
+  @@index([code])
+  @@index([obsId])
+  @@index([isManagement])
   @@map("divisions")
 }
 
 model Department {
   id          Int       @id @default(autoincrement())
+  divisionId  Int       @map("division_id")
   name        String    @unique @db.VarChar(100)
   code        String    @unique @db.VarChar(100)
-  obsId       Int       @map("obs_id")
-  divisionId  Int?      @map("division_id")
-  category    String    @db.VarChar(50)
+  managerId   Int?      @unique @map("manager_id")
+  category    String?   @db.VarChar(50)
   description String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
 
-  obs             Obs                  @relation(fields: [obsId], references: [id])
-  division        Division?            @relation(fields: [divisionId], references: [id])
+  division        Division             @relation(fields: [divisionId], references: [id])
+  manager         Employee?            @relation("DepartmentManager", fields: [managerId], references: [employeeId])
   jobTitles       DepartmentJobTitle[]
   employeeBudgets EmployeeBudget[]
+  employees       Employee[]
 
-  @@index([obsId])
   @@index([divisionId])
   @@map("departments")
 }
@@ -155,19 +176,21 @@ enum JobLevelCategory {
 }
 
 model JobLevel {
-  id                BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
-  name              String            @unique @db.Char(100)
+  id                BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  name              String           @unique @db.Char(100)
+  code              String?          @unique @db.VarChar(50)
   category          JobLevelCategory
-  description       String?           @db.Text
-  canCreateJobTitle Boolean           @default(false) @map("can_create_job_title")
-  canCreateKpi      Boolean           @default(false) @map("can_create_kpi")
+  description       String?          @db.Text
+  canCreateJobTitle Boolean          @default(false) @map("can_create_job_title")
+  canCreateKpi      Boolean          @default(false) @map("can_create_kpi")
   order             Int?
-  createdAt         DateTime?         @default(now()) @map("created_at")
-  updatedAt         DateTime?         @map("updated_at")
+  createdAt         DateTime?        @default(now()) @map("created_at")
+  updatedAt         DateTime?        @map("updated_at")
 
   jobTitles JobTitle[]
 
   @@index([name])
+  @@index([code])
   @@index([category])
   @@map("job_levels")
 }
@@ -196,6 +219,7 @@ model JobTitle {
   subordinates JobTitle[] @relation("DirectReport")
 
   departments DepartmentJobTitle[]
+  employees   Employee[]
 
   @@index([jobLevelId])
   @@index([directReportId])
@@ -227,7 +251,7 @@ model EmployeeBudget {
   createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
-  department   Department @relation(fields: [departmentId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
 
   @@map("employee_budget")
 }
@@ -265,7 +289,7 @@ model EmployeeRequest {
   createdAt             DateTime?             @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt             DateTime?             @map("updated_at") @db.Timestamp(0)
 
-  createdByUser User                      @relation(fields: [createdBy], references: [id])
+  createdByUser User                     @relation(fields: [createdBy], references: [id])
   comments      EmployeeRequestComment[]
 
   @@map("employee_request")
@@ -298,34 +322,34 @@ enum CandidateGender {
 }
 
 model CandidateRecruitment {
-  id             BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
-  verify         CandidateVerify
-  token          String          @db.Text
-  email          String          @db.VarChar(32)
-  fullname       String          @db.VarChar(32)
-  address        String          @db.Text
-  resident_status String         @db.VarChar(32)
-  birth_place    String          @db.VarChar(32)
-  birth_date     DateTime        @db.Date
-  religion       String          @db.VarChar(32)
-  ethnic_group   String?         @db.VarChar(32)
-  id_no          String          @db.VarChar(32)
-  tax_id         String          @db.VarChar(32)
-  bpjs_id        String          @db.VarChar(32)
-  citizenship    String          @db.VarChar(32)
-  marrital_status String         @db.VarChar(32)
-  gender         CandidateGender?
-  mobile_phone   String          @db.VarChar(32)
-  domicile_address String?       @db.Text
-  driving_license String         @db.VarChar(32)
-  document_1     String          @db.Text
-  document_2     String          @db.Text
-  uniform_shirt_size  String?    @db.VarChar(10)
-  uniform_pants_size  String?    @db.VarChar(10)
-  agreementAcceptedAt DateTime?  @map("agreement_accepted_at") @db.Timestamp(0)
-  agreementVersion    String?    @map("agreement_version") @db.VarChar(20)
-  createdAt      DateTime?       @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt      DateTime?       @map("updated_at") @db.Timestamp(0)
+  id                  BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  verify              CandidateVerify
+  token               String           @db.Text
+  email               String           @db.VarChar(32)
+  fullname            String           @db.VarChar(32)
+  address             String           @db.Text
+  resident_status     String           @db.VarChar(32)
+  birth_place         String           @db.VarChar(32)
+  birth_date          DateTime         @db.Date
+  religion            String           @db.VarChar(32)
+  ethnic_group        String?          @db.VarChar(32)
+  id_no               String           @db.VarChar(32)
+  tax_id              String           @db.VarChar(32)
+  bpjs_id             String           @db.VarChar(32)
+  citizenship         String           @db.VarChar(32)
+  marrital_status     String           @db.VarChar(32)
+  gender              CandidateGender?
+  mobile_phone        String           @db.VarChar(32)
+  domicile_address    String?          @db.Text
+  driving_license     String           @db.VarChar(32)
+  document_1          String           @db.Text
+  document_2          String           @db.Text
+  uniform_shirt_size  String?          @db.VarChar(10)
+  uniform_pants_size  String?          @db.VarChar(10)
+  agreementAcceptedAt DateTime?        @map("agreement_accepted_at") @db.Timestamp(0)
+  agreementVersion    String?          @map("agreement_version") @db.VarChar(20)
+  createdAt           DateTime?        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime?        @map("updated_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment")
 }
@@ -336,57 +360,57 @@ enum CandidateDetailVerify {
 }
 
 model candidate_recruitment_detail {
-  id                  BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  id                  BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
   candidate_id        Int
   job_title_id        Int
-  createdAt           DateTime?            @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt           DateTime?            @map("updated_at") @db.Timestamp(0)
-  candidate_code      String               @db.VarChar(30)
-  candidate_token     String               @db.Text
+  createdAt           DateTime?             @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt           DateTime?             @map("updated_at") @db.Timestamp(0)
+  candidate_code      String                @db.VarChar(30)
+  candidate_token     String                @db.Text
   candidate_verify    CandidateDetailVerify
-  employee_request_id String               @db.Text
+  employee_request_id String                @db.Text
 
   @@map("candidate_recruitment_detail")
 }
 
 enum AssessmentStatus {
-  PENDING  @map("0")
-  PASSED   @map("1")
-  FAILED   @map("2")
+  PENDING @map("0")
+  PASSED  @map("1")
+  FAILED  @map("2")
 }
 
 model candidate_recruitment_assessment {
-  id                            BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id                  Int
+  id                              BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id                    Int
   candidate_recruitment_detail_id Int
-  interview1_desc               String           @db.Text
-  interview1_status             AssessmentStatus
-  interview2_desc               String           @db.Text
-  interview2_status             AssessmentStatus
-  mcu_desc                      String           @db.Text
-  mcu_status                    AssessmentStatus
-  reason_to_move                String           @db.Text
-  purpose_of_applying           String           @db.Text
-  last_salary                   String           @db.VarChar(30)
-  active_language               String           @db.VarChar(30)
-  loyality                      String           @db.VarChar(30)
-  when_ready_work               String           @db.VarChar(30)
-  ref_contact_name              String           @db.VarChar(30)
-  last_job_description          String           @db.Text
-  tasks_jobs                    String           @db.Text
-  expected_salary               String           @db.VarChar(30)
-  rotate_work                   String           @db.VarChar(30)
-  employees_you_know            String           @db.VarChar(30)
-  relationship_with_the_employee String          @db.VarChar(30)
-  ref_mobile_phone              String           @db.VarChar(30)
-  createdAt                     DateTime?        @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                     DateTime?        @map("updated_at") @db.Timestamp(0)
-  assessment_assigned_to        String           @db.VarChar(50)
-  interview_started_at          DateTime?        @map("interview_started_at") @db.Timestamp(0)
-  interview_date                DateTime?        @map("interview_date") @db.Timestamp(0)
-  interview_type                InterviewType?   @map("interview_type")
-  mcu_document_url              String?          @map("mcu_document_url") @db.VarChar(500)
-  mcu_document_name             String?          @map("mcu_document_name") @db.VarChar(255)
+  interview1_desc                 String           @db.Text
+  interview1_status               AssessmentStatus
+  interview2_desc                 String           @db.Text
+  interview2_status               AssessmentStatus
+  mcu_desc                        String           @db.Text
+  mcu_status                      AssessmentStatus
+  reason_to_move                  String           @db.Text
+  purpose_of_applying             String           @db.Text
+  last_salary                     String           @db.VarChar(30)
+  active_language                 String           @db.VarChar(30)
+  loyality                        String           @db.VarChar(30)
+  when_ready_work                 String           @db.VarChar(30)
+  ref_contact_name                String           @db.VarChar(30)
+  last_job_description            String           @db.Text
+  tasks_jobs                      String           @db.Text
+  expected_salary                 String           @db.VarChar(30)
+  rotate_work                     String           @db.VarChar(30)
+  employees_you_know              String           @db.VarChar(30)
+  relationship_with_the_employee  String           @db.VarChar(30)
+  ref_mobile_phone                String           @db.VarChar(30)
+  createdAt                       DateTime?        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                       DateTime?        @map("updated_at") @db.Timestamp(0)
+  assessment_assigned_to          String           @db.VarChar(50)
+  interview_started_at            DateTime?        @map("interview_started_at") @db.Timestamp(0)
+  interview_date                  DateTime?        @map("interview_date") @db.Timestamp(0)
+  interview_type                  InterviewType?   @map("interview_type")
+  mcu_document_url                String?          @map("mcu_document_url") @db.VarChar(500)
+  mcu_document_name               String?          @map("mcu_document_name") @db.VarChar(255)
 
   scoring   candidate_assessment_scoring[]
   assignees candidate_assessment_assignee[]
@@ -395,8 +419,8 @@ model candidate_recruitment_assessment {
 }
 
 enum InterviewType {
-  ONLINE  @map("online")
-  ONSITE  @map("onsite")
+  ONLINE @map("online")
+  ONSITE @map("onsite")
 }
 
 enum InterviewStage {
@@ -411,33 +435,33 @@ enum AssessmentConclusion {
 }
 
 model candidate_assessment_scoring {
-  id                      BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
-  assessment_id           BigInt               @db.UnsignedBigInt
-  stage                   InterviewStage
+  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  assessment_id BigInt         @db.UnsignedBigInt
+  stage         InterviewStage
 
   // Scoring criteria (1-5 scale)
-  relevance_of_experience   Int                @db.TinyInt
-  training_undertaken       Int                @db.TinyInt
-  technical_skills          Int                @db.TinyInt
-  non_technical_skills      Int                @db.TinyInt
-  communication_skills      Int                @db.TinyInt
-  emotional_maturity        Int                @db.TinyInt
-  understanding_of_position Int                @db.TinyInt
-  teamwork_ability          Int                @db.TinyInt
-  total_score               Int                @db.TinyInt
+  relevance_of_experience   Int @db.TinyInt
+  training_undertaken       Int @db.TinyInt
+  technical_skills          Int @db.TinyInt
+  non_technical_skills      Int @db.TinyInt
+  communication_skills      Int @db.TinyInt
+  emotional_maturity        Int @db.TinyInt
+  understanding_of_position Int @db.TinyInt
+  teamwork_ability          Int @db.TinyInt
+  total_score               Int @db.TinyInt
 
   // Conclusion
-  conclusion              AssessmentConclusion
+  conclusion AssessmentConclusion
 
   // Rich text (Lexical JSON)
-  key_competencies        Json?                @db.Json
-  interviewer_notes       Json?                @db.Json
+  key_competencies  Json? @db.Json
+  interviewer_notes Json? @db.Json
 
   // Audit
-  assessed_by             String?              @db.VarChar(50)
-  assessed_at             DateTime?            @db.Timestamp(0)
-  createdAt               DateTime?            @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt               DateTime?            @map("updated_at") @db.Timestamp(0)
+  assessed_by String?   @db.VarChar(50)
+  assessed_at DateTime? @db.Timestamp(0)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
 
   assessment candidate_recruitment_assessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
 
@@ -465,30 +489,30 @@ model candidate_assessment_assignee {
 }
 
 model candidate_recruitment_onboarding {
-  id                            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id                  Int
-  employee_request_id           Int
+  id                              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id                    Int
+  employee_request_id             Int
   candidate_recruitment_detail_id Int
-  job_placement                 String    @db.VarChar(30)
-  document                      String    @db.VarChar(100)
-  createdAt                     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                     DateTime? @map("updated_at") @db.Timestamp(0)
-  document_candidate            String    @db.Text
-  onboardingAcceptedAt          DateTime? @map("onboarding_accepted_at") @db.Timestamp(0)
+  job_placement                   String    @db.VarChar(30)
+  document                        String    @db.VarChar(100)
+  createdAt                       DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                       DateTime? @map("updated_at") @db.Timestamp(0)
+  document_candidate              String    @db.Text
+  onboardingAcceptedAt            DateTime? @map("onboarding_accepted_at") @db.Timestamp(0)
 
   @@map("candidate_recruitment_onboarding")
 }
 
 model facillities {
-  id                                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  inventory_no                      String    @db.VarChar(255)
-  item                              String    @db.VarChar(255)
-  qty                               Int       @default(1)
-  unit                              String    @db.VarChar(50)
-  condition                         String    @db.VarChar(50)
-  status                            String    @db.VarChar(50)
-  created_at                        DateTime? @default(now()) @db.Timestamp(0)
-  updated_at                        DateTime? @db.Timestamp(0)
+  id                                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  inventory_no                        String    @db.VarChar(255)
+  item                                String    @db.VarChar(255)
+  qty                                 Int       @default(1)
+  unit                                String    @db.VarChar(50)
+  condition                           String    @db.VarChar(50)
+  status                              String    @db.VarChar(50)
+  created_at                          DateTime? @default(now()) @db.Timestamp(0)
+  updated_at                          DateTime? @db.Timestamp(0)
   candidate_recruitment_onboarding_id Int
 
   @@index([candidate_recruitment_onboarding_id])
@@ -496,15 +520,15 @@ model facillities {
 }
 
 model OnboardingProgram {
-  id                                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  id                                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   candidate_recruitment_onboarding_id Int
-  program                           String    @db.VarChar(255)
-  date                              String    @db.VarChar(50)
-  location                          String    @db.VarChar(255)
-  pic                               String    @db.VarChar(255)
-  status                            String    @db.VarChar(50)
-  createdAt                         DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt                         DateTime? @map("updated_at") @db.Timestamp(0)
+  program                             String    @db.VarChar(255)
+  date                                String    @db.VarChar(50)
+  location                            String    @db.VarChar(255)
+  pic                                 String    @db.VarChar(255)
+  status                              String    @db.VarChar(50)
+  createdAt                           DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                           DateTime? @map("updated_at") @db.Timestamp(0)
 
   @@index([candidate_recruitment_onboarding_id])
   @@map("onboarding_program")

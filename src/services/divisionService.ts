@@ -2,22 +2,34 @@ import type { Division } from '@prisma/client'
 
 import { NotFoundError, ConflictError } from '../errors/index.js'
 import * as divisionRepository from '../repositories/divisionRepository.js'
-import type { DivisionFilters, PaginationParams } from '../repositories/divisionRepository.js'
+import type {
+  DivisionFilters,
+  PaginationParams,
+  DivisionWithRelations
+} from '../repositories/divisionRepository.js'
 
 export type CreateDivisionServiceData = {
   name: string
   code?: string
+  obsId?: number
+  isManagement?: boolean
+  headOfDivisionId?: number
+  deputyHeadId?: number
   description?: string
 }
 
 export type UpdateDivisionServiceData = {
-  name: string
+  name?: string
   code?: string
+  obsId?: number | null
+  isManagement?: boolean
+  headOfDivisionId?: number | null
+  deputyHeadId?: number | null
   description?: string
 }
 
 export type PaginatedDivisions = {
-  items: Division[]
+  items: DivisionWithRelations[]
   total: number
 }
 
@@ -34,7 +46,7 @@ export async function getAllDivisions(
   return result.getValue()
 }
 
-export async function getDivisionById(id: number): Promise<Division> {
+export async function getDivisionById(id: number): Promise<DivisionWithRelations> {
   const result = await divisionRepository.findById(id)
 
   if (result.isFailure()) {
@@ -81,7 +93,7 @@ export async function updateDivision(id: number, data: UpdateDivisionServiceData
     throw new NotFoundError('Division not found')
   }
 
-  if (data.name !== existing.name) {
+  if (data.name && data.name !== existing.name) {
     const nameExistsResult = await divisionRepository.nameExistsExcept(data.name, id)
 
     if (nameExistsResult.isFailure()) {
@@ -129,4 +141,98 @@ export async function deleteDivision(id: number): Promise<void> {
   if (result.isFailure()) {
     throw new Error(result.error)
   }
+}
+
+export async function assignHeadOfDivision(id: number, employeeId: number): Promise<Division> {
+  const existingResult = await divisionRepository.findById(id)
+
+  if (existingResult.isFailure()) {
+    throw new Error(existingResult.error)
+  }
+
+  const existing = existingResult.getValue()
+  if (!existing) {
+    throw new NotFoundError('Division not found')
+  }
+
+  const result = await divisionRepository.assignHead(id, employeeId)
+
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+
+  return result.getValue()
+}
+
+export async function removeHeadOfDivision(id: number): Promise<Division> {
+  const existingResult = await divisionRepository.findById(id)
+
+  if (existingResult.isFailure()) {
+    throw new Error(existingResult.error)
+  }
+
+  const existing = existingResult.getValue()
+  if (!existing) {
+    throw new NotFoundError('Division not found')
+  }
+
+  const result = await divisionRepository.removeHead(id)
+
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+
+  return result.getValue()
+}
+
+export async function assignDeputyHead(id: number, employeeId: number): Promise<Division> {
+  const existingResult = await divisionRepository.findById(id)
+
+  if (existingResult.isFailure()) {
+    throw new Error(existingResult.error)
+  }
+
+  const existing = existingResult.getValue()
+  if (!existing) {
+    throw new NotFoundError('Division not found')
+  }
+
+  const result = await divisionRepository.assignDeputy(id, employeeId)
+
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+
+  return result.getValue()
+}
+
+export async function removeDeputyHead(id: number): Promise<Division> {
+  const existingResult = await divisionRepository.findById(id)
+
+  if (existingResult.isFailure()) {
+    throw new Error(existingResult.error)
+  }
+
+  const existing = existingResult.getValue()
+  if (!existing) {
+    throw new NotFoundError('Division not found')
+  }
+
+  const result = await divisionRepository.removeDeputy(id)
+
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+
+  return result.getValue()
+}
+
+export async function getManagementDivisions(): Promise<DivisionWithRelations[]> {
+  const result = await divisionRepository.findManagementDivisions()
+
+  if (result.isFailure()) {
+    throw new Error(result.error)
+  }
+
+  return result.getValue()
 }

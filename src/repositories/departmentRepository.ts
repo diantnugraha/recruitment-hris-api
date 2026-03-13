@@ -1,20 +1,25 @@
-import type { Department, Obs, Prisma } from '@prisma/client'
+import type { Department, Prisma } from '@prisma/client'
 
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
-import { type DepartmentCategory, toPrismaCategory } from '../constants/departmentConstants.js'
 
 export type DepartmentWithRelations = Department & {
-  obs: Pick<Obs, 'id' | 'name' | 'cluster'>
+  division?: {
+    id: number
+    name: string
+    isManagement: boolean
+    obs?: { id: number; name: string } | null
+  } | null
+  manager?: { employeeId: number; employeeName: string | null } | null
+  _count?: { employees: number; jobTitles: number }
 }
 
 export type DepartmentFilters = {
   name?: string
   code?: string
-  description?: string
-  obsId?: number
   divisionId?: number
-  category?: DepartmentCategory
+  category?: string
+  isManagement?: boolean
 }
 
 export type PaginationParams = {
@@ -30,38 +35,32 @@ export type PaginatedResult = {
 export type CreateDepartmentData = {
   name: string
   code: string
-  obsId: number
-  divisionId?: number
-  category: DepartmentCategory
+  divisionId: number
+  managerId?: number
+  category?: string
   description?: string
 }
 
 export type UpdateDepartmentData = {
-  name: string
-  code: string
-  obsId: number
+  name?: string
+  code?: string
   divisionId?: number
-  category: DepartmentCategory
+  managerId?: number | null
+  category?: string
   description?: string
 }
 
-const departmentSelectFields = {
-  id: true,
-  name: true,
-  code: true,
-  obsId: true,
-  divisionId: true,
-  category: true,
-  description: true,
-  createdAt: true,
-  updatedAt: true,
-  obs: {
+const departmentInclude = {
+  division: {
     select: {
       id: true,
       name: true,
-      cluster: true
+      isManagement: true,
+      obs: { select: { id: true, name: true } }
     }
-  }
+  },
+  manager: { select: { employeeId: true, employeeName: true } },
+  _count: { select: { employees: true, jobTitles: true } }
 } as const
 
 export async function findAll(
@@ -70,18 +69,20 @@ export async function findAll(
 ): Promise<RepositoryResult<PaginatedResult>> {
   try {
     const where: Prisma.DepartmentWhereInput = {
+      // Ensure division exists to prevent "Field division is required" errors
+      division: filters.isManagement !== undefined
+        ? { isManagement: filters.isManagement }
+        : { id: { gt: 0 } },
       ...(filters.name && { name: { contains: filters.name } }),
       ...(filters.code && { code: { contains: filters.code } }),
-      ...(filters.description && { description: { contains: filters.description } }),
-      ...(filters.obsId && { obsId: filters.obsId }),
       ...(filters.divisionId && { divisionId: filters.divisionId }),
-      ...(filters.category && { category: toPrismaCategory(filters.category) })
+      ...(filters.category && { category: filters.category })
     }
 
     const [items, total] = await prisma.$transaction([
       prisma.department.findMany({
         where,
-        select: departmentSelectFields,
+        include: departmentInclude,
         orderBy: { name: 'asc' },
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit
@@ -100,11 +101,25 @@ export async function findById(id: number): Promise<RepositoryResult<DepartmentW
   try {
     const department = await prisma.department.findUnique({
       where: { id },
-      select: departmentSelectFields
+      include: departmentInclude
     })
     return success(department)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to find department by id'
+    return failure(message)
+  }
+}
+
+export async function findByDivisionId(divisionId: number): Promise<RepositoryResult<DepartmentWithRelations[]>> {
+  try {
+    const departments = await prisma.department.findMany({
+      where: { divisionId },
+      include: departmentInclude,
+      orderBy: { name: 'asc' }
+    })
+    return success(departments)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch departments by division'
     return failure(message)
   }
 }
@@ -115,12 +130,12 @@ export async function create(data: CreateDepartmentData): Promise<RepositoryResu
       data: {
         name: data.name,
         code: data.code,
-        obsId: data.obsId,
         divisionId: data.divisionId,
-        category: toPrismaCategory(data.category),
-        description: data.description
+        ...(data.managerId !== undefined && { managerId: data.managerId }),
+        ...(data.category !== undefined && { category: data.category }),
+        ...(data.description !== undefined && { description: data.description })
       },
-      select: departmentSelectFields
+      include: departmentInclude
     })
     return success(department)
   } catch (error) {
@@ -134,15 +149,15 @@ export async function update(id: number, data: UpdateDepartmentData): Promise<Re
     const department = await prisma.department.update({
       where: { id },
       data: {
-        name: data.name,
-        code: data.code,
-        obsId: data.obsId,
-        divisionId: data.divisionId,
-        category: toPrismaCategory(data.category),
-        description: data.description,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.code !== undefined && { code: data.code }),
+        ...(data.divisionId !== undefined && { divisionId: data.divisionId }),
+        ...(data.managerId !== undefined && { managerId: data.managerId }),
+        ...(data.category !== undefined && { category: data.category }),
+        ...(data.description !== undefined && { description: data.description }),
         updatedAt: new Date()
       },
-      select: departmentSelectFields
+      include: departmentInclude
     })
     return success(department)
   } catch (error) {
@@ -217,6 +232,55 @@ export async function codeExistsExcept(code: string, exceptId: number): Promise<
     return success(department !== null)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to check code existence'
+    return failure(message)
+  }
+}
+
+export async function hasEmployees(id: number): Promise<RepositoryResult<boolean>> {
+  try {
+    const count = await prisma.employee.count({
+      where: { departmentId: id }
+    })
+    return success(count > 0)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to check employees'
+    return failure(message)
+  }
+}
+
+export async function assignManager(
+  id: number,
+  employeeId: number
+): Promise<RepositoryResult<DepartmentWithRelations>> {
+  try {
+    const department = await prisma.department.update({
+      where: { id },
+      data: {
+        managerId: employeeId,
+        updatedAt: new Date()
+      },
+      include: departmentInclude
+    })
+    return success(department)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to assign manager'
+    return failure(message)
+  }
+}
+
+export async function removeManager(id: number): Promise<RepositoryResult<DepartmentWithRelations>> {
+  try {
+    const department = await prisma.department.update({
+      where: { id },
+      data: {
+        managerId: null,
+        updatedAt: new Date()
+      },
+      include: departmentInclude
+    })
+    return success(department)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove manager'
     return failure(message)
   }
 }
