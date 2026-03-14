@@ -14,7 +14,7 @@ model User {
   password        String    @db.VarChar(255)
   displayName     String    @map("display_name") @db.VarChar(100)
   roleId          Int       @map("role_id")
-  employeeId      Int       @unique @map("employee_id")
+  employeeId      Int?      @unique @map("employee_id")
   superiorId      Int?      @map("superior_id")
   rememberToken   String?   @map("remember_token") @db.VarChar(100)
   emailVerifiedAt DateTime? @map("email_verified_at")
@@ -23,8 +23,8 @@ model User {
   updated_at      DateTime?
   trash           DateTime? @map("deleted_at")
 
-  role     Role       @relation(fields: [roleId], references: [roleId])
-  employee Employee   @relation(fields: [employeeId], references: [employeeId])
+  role     Role      @relation(fields: [roleId], references: [roleId])
+  employee Employee? @relation(fields: [employeeId], references: [employeeId])
   files    UserFile[]
 
   employeeRequests        EmployeeRequest[]
