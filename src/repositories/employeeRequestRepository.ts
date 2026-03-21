@@ -197,7 +197,7 @@ async function generateCode(): Promise<string> {
 }
 
 function buildRoleWhereClause(roleFilter: RoleFilter): Record<string, unknown> {
-  const { roleName, userId, managedDepartmentIds, hodDivisionIds } = roleFilter
+  const { roleName, userId, hodDivisionIds } = roleFilter
 
   if (roleName === 'admin') return {}
 

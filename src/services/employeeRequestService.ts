@@ -195,7 +195,7 @@ export async function updateEmployeeRequest(
 async function authorizeStatusTransition(
   user: EnrichedUser,
   currentStatus: EmployeeRequestStatus,
-  targetStatus: EmployeeRequestStatus,
+  _targetStatus: EmployeeRequestStatus,
   employeeRequest: { departmentId?: number | null; createdBy: number }
 ): Promise<void> {
   const { roleName, managedDepartmentIds, headOfDivisionIds, employeeId } = user
