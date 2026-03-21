@@ -53,6 +53,7 @@ export const CreateEmployeeRequestBodySchema = Type.Object({
   job_placement: Type.Optional(Type.String({ maxLength: 30 })),
   budget: Type.Optional(Type.String({ maxLength: 50 })),
   expected_onboard_date: Type.Optional(Type.String({ format: 'date' })),
+  department_id: Type.Optional(Type.Integer({ minimum: 1 })),
   status: Type.Optional(Type.Union([
     Type.Literal(EMPLOYEE_REQUEST_STATUS.DRAFT),
     Type.Literal(EMPLOYEE_REQUEST_STATUS.CREATED)

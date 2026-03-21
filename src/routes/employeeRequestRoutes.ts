@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as employeeRequestController from '../controllers/employeeRequestController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { enrichUserContext } from '../middlewares/enrichUserContext.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
 import {
   EmployeeRequestQuerySchema,
@@ -18,6 +19,7 @@ import {
 
 export async function employeeRequestRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authenticate)
+  app.addHook('preHandler', enrichUserContext)
 
   // Get stats/summary
   app.get(
@@ -94,5 +96,12 @@ export async function employeeRequestRoutes(app: FastifyInstance): Promise<void>
     '/:id/start-recruitment',
     { schema: { params: IdParamSchema } },
     employeeRequestController.startRecruitment
+  )
+
+  // Generate PDF for employee request
+  app.get<{ Params: IdParam }>(
+    '/:id/pdf',
+    { schema: { params: IdParamSchema } },
+    employeeRequestController.generatePdf
   )
 }
