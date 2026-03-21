@@ -12,6 +12,10 @@ import * as employeeRequestService from '../services/employeeRequestService.js'
 import { STATUS_MAP, GENDER_MAP } from '../repositories/employeeRequestRepository.js'
 import type { EmployeeRequestWithRelations } from '../repositories/employeeRequestRepository.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
+import { generateEmployeeRequestPdf, extractTextLines } from '../services/employeeRequestPdfService.js'
+import type { EmployeeRequestPdfData } from '../services/employeeRequestPdfService.js'
+import { prisma } from '../config/database.js'
+import { getRestBudget } from '../services/employeeBudgetService.js'
 
 // Transform employee request for API response
 function transformEmployeeRequest(request: EmployeeRequestWithRelations) {
@@ -96,7 +100,14 @@ export async function getAll(
 
   const pagination = { page, limit }
 
-  const result = await employeeRequestService.getAllEmployeeRequests(filters, pagination)
+  const roleFilter = request.enrichedUser ? {
+    roleName: request.enrichedUser.roleName,
+    userId: request.enrichedUser.userId,
+    managedDepartmentIds: request.enrichedUser.managedDepartmentIds,
+    hodDivisionIds: request.enrichedUser.headOfDivisionIds,
+  } : undefined
+
+  const result = await employeeRequestService.getAllEmployeeRequests(filters, pagination, roleFilter)
 
   const transformedItems = result.items.map(transformEmployeeRequest)
   const paginationData = calculatePagination(page, limit, result.total)
@@ -186,9 +197,13 @@ export async function updateStatus(
 ): Promise<void> {
   const { id } = request.params
   const { status, comment } = request.body
-  const user = request.user
 
-  const employeeRequest = await employeeRequestService.updateEmployeeRequestStatus(id, status, user.userId, comment)
+  const enrichedUser = request.enrichedUser
+  if (!enrichedUser) {
+    throw new Error('Enriched user context is missing')
+  }
+
+  const employeeRequest = await employeeRequestService.updateEmployeeRequestStatus(id, status, enrichedUser, comment)
   const transformed = transformEmployeeRequest(employeeRequest)
 
   sendSuccess(reply, transformed, 'Employee request status updated successfully')
@@ -227,10 +242,17 @@ export async function remove(
 }
 
 export async function getStats(
-  _request: FastifyRequest,
+  request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const stats = await employeeRequestService.getStats()
+  const roleFilter = request.enrichedUser ? {
+    roleName: request.enrichedUser.roleName,
+    userId: request.enrichedUser.userId,
+    managedDepartmentIds: request.enrichedUser.managedDepartmentIds,
+    hodDivisionIds: request.enrichedUser.headOfDivisionIds,
+  } : undefined
+
+  const stats = await employeeRequestService.getStats(roleFilter)
 
   sendSuccess(reply, stats)
 }
@@ -240,10 +262,129 @@ export async function startRecruitment(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const user = request.user
 
-  const employeeRequest = await employeeRequestService.startRecruitment(id, user.userId)
+  const enrichedUser = request.enrichedUser
+  if (!enrichedUser) {
+    throw new Error('Enriched user context is missing')
+  }
+
+  const employeeRequest = await employeeRequestService.startRecruitment(id, enrichedUser)
   const transformed = transformEmployeeRequest(employeeRequest)
 
   sendSuccess(reply, transformed, 'Recruitment started successfully')
+}
+
+export async function generatePdf(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const employeeRequest = await employeeRequestService.getEmployeeRequestById(id)
+  const pdfData = await buildPdfData(employeeRequest)
+  const pdfBuffer = await generateEmployeeRequestPdf(pdfData)
+
+  reply
+    .header('Content-Type', 'application/pdf')
+    .header('Content-Disposition', `inline; filename="Employee-Request-${employeeRequest.code}.pdf"`)
+    .send(pdfBuffer)
+}
+
+async function buildPdfData(er: EmployeeRequestWithRelations): Promise<EmployeeRequestPdfData> {
+  const genderString = GENDER_MAP[er.gender] || 'any'
+
+  // Fetch job title with level, division, and department in parallel
+  const [jobTitleData, departmentPivot] = await Promise.all([
+    prisma.jobTitle.findUnique({
+      where: { id: BigInt(er.jobTitleId) },
+      include: {
+        jobLevel: { select: { name: true } },
+        division: { select: { id: true, name: true } }
+      }
+    }),
+    prisma.departmentJobTitle.findFirst({
+      where: { jobTitleId: BigInt(er.jobTitleId) },
+      include: {
+        department: {
+          include: {
+            division: {
+              include: {
+                headOfDivision: {
+                  select: { employeeId: true, employeeName: true }
+                }
+              }
+            }
+          }
+        }
+      }
+    })
+  ])
+
+  const department = departmentPivot?.department ?? null
+  const division = department?.division ?? jobTitleData?.division ?? null
+
+  // Get rest budget for the department
+  const budgetStr = er.budget || ''
+  let remainingBudgetStr = ''
+  if (department) {
+    try {
+      const restBudget = await getRestBudget(department.id)
+      const jobType = jobTitleData?.type
+      if (jobType === 'Technical') {
+        remainingBudgetStr = String(restBudget.rest.technical)
+      } else {
+        remainingBudgetStr = String(restBudget.rest.admin)
+      }
+    } catch {
+      // Budget info unavailable
+    }
+  }
+
+  const formatDate = (d: Date | string | null | undefined): string => {
+    if (!d) return ''
+    const date = d instanceof Date ? d : new Date(d)
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  // Extract text from lexical JSON fields
+  const jobDescLines = extractTextLines(er.jobDescription)
+  const jobReqLines = extractTextLines(er.jobRequirement)
+  const isReplacement = er.purpose === 'replacement'
+
+  // Build Head of Division name
+  const hodEmployee = division && 'headOfDivision' in division
+    ? (division as { headOfDivision?: { employeeName?: string | null } | null }).headOfDivision
+    : null
+  const hodName = hodEmployee?.employeeName || ''
+
+  return {
+    position: er.jobTitle?.name || jobTitleData?.name || '',
+    division: division?.name || '',
+    department: department?.name || '',
+    numberOfRequired: 1,
+    requestedDate: formatDate(er.createdAt),
+    dateRequired: formatDate(er.expectedOnboardDate),
+    positionLevel: jobTitleData?.jobLevel?.name || '',
+    typeOfRequest: isReplacement ? 'replacement' : 'new',
+    budget: budgetStr,
+    remainingBudget: remainingBudgetStr,
+    genderMale: genderString === 'male' || genderString === 'any',
+    genderFemale: genderString === 'female' || genderString === 'any',
+    reason: er.reason || er.generalJobPurpose || '',
+    placement: er.jobPlacement || '',
+    jobDescriptions: jobDescLines.slice(0, 6),
+    minimumAge: er.ageFrom ? String(er.ageFrom) : '',
+    maximumAge: er.ageTo ? String(er.ageTo) : '',
+    educational: er.education || '',
+    majors: '',
+    experience: er.experience || '',
+    mandatoryCompetencies: jobReqLines.slice(0, 5),
+    specialistCompetencies: jobReqLines.slice(5, 8),
+    optionalCompetencies: jobReqLines.slice(8, 10),
+    createdByName: er.createdByUser?.displayName || er.createdByUser?.name || '',
+    createdByDept: department?.name || '',
+    acknowledgeByName: hodName,
+    checkedByName: '',
+    approvedByName: '',
+  }
 }

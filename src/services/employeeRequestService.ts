@@ -1,16 +1,20 @@
-import { NotFoundError, ConflictError } from '../errors/index.js'
+import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from '../errors/index.js'
 import * as employeeRequestRepository from '../repositories/employeeRequestRepository.js'
 import { STATUS_MAP, STATUS_REVERSE_MAP } from '../repositories/employeeRequestRepository.js'
 import type {
   EmployeeRequestFilters,
   PaginationParams,
-  EmployeeRequestWithRelations
+  EmployeeRequestWithRelations,
+  RoleFilter
 } from '../repositories/employeeRequestRepository.js'
+import type { EnrichedUser } from '../middlewares/enrichUserContext.js'
 import {
   EMPLOYEE_REQUEST_STATUS,
   WORKFLOW_TRANSITIONS,
   type EmployeeRequestStatus
 } from '../constants/employeeRequestConstants.js'
+import { prisma } from '../config/database.js'
+import { getRestBudget } from './employeeBudgetService.js'
 
 export type CreateEmployeeRequestServiceData = {
   jobTitleId: number
@@ -58,11 +62,56 @@ function getStatusString(statusInt: number): EmployeeRequestStatus {
   return (STATUS_MAP[statusInt] || 'draft') as EmployeeRequestStatus
 }
 
+// Resolve job title type and department for budget validation
+async function resolveJobTitleBudgetInfo(jobTitleId: number): Promise<{
+  type: 'Technical' | 'Administration' | null
+  departmentId: number | null
+}> {
+  const jobTitle = await prisma.jobTitle.findUnique({
+    where: { id: BigInt(jobTitleId) },
+    select: { type: true }
+  })
+
+  const pivot = await prisma.departmentJobTitle.findFirst({
+    where: { jobTitleId: BigInt(jobTitleId) },
+    select: { departmentId: true }
+  })
+
+  return {
+    type: jobTitle?.type ?? null,
+    departmentId: pivot?.departmentId ?? null
+  }
+}
+
+// Validate employee budget before submitting request
+async function validateBudgetForRequest(jobTitleId: number): Promise<void> {
+  const { type, departmentId } = await resolveJobTitleBudgetInfo(jobTitleId)
+
+  if (!type) {
+    throw new ValidationError('Job title does not have a category (Technical/Administration). Please update the job title first.')
+  }
+  if (!departmentId) {
+    throw new ValidationError('Job title is not assigned to any department.')
+  }
+
+  const restBudgetData = await getRestBudget(departmentId)
+  const budgetCategory = type === 'Technical' ? 'technical' : 'admin'
+  const available = restBudgetData.rest[budgetCategory]
+
+  if (available <= 0) {
+    const label = type === 'Technical' ? 'Technical' : 'Administration'
+    throw new ValidationError(
+      `Insufficient ${label} budget for this department. Available: ${available}. Please check the employee budget allocation.`
+    )
+  }
+}
+
 export async function getAllEmployeeRequests(
   filters: EmployeeRequestFilters,
-  pagination: PaginationParams
+  pagination: PaginationParams,
+  roleFilter?: RoleFilter
 ): Promise<PaginatedEmployeeRequests> {
-  const result = await employeeRequestRepository.findAll(filters, pagination)
+  const result = await employeeRequestRepository.findAll(filters, pagination, roleFilter)
 
   if (result.isFailure()) {
     throw new Error(result.error)
@@ -87,6 +136,11 @@ export async function getEmployeeRequestById(id: number): Promise<EmployeeReques
 }
 
 export async function createEmployeeRequest(data: CreateEmployeeRequestServiceData): Promise<EmployeeRequestWithRelations> {
+  // Validate budget when submitting (not when saving as draft)
+  if (data.status === 'created') {
+    await validateBudgetForRequest(data.jobTitleId)
+  }
+
   const result = await employeeRequestRepository.create(data)
 
   if (result.isFailure()) {
@@ -138,10 +192,58 @@ export async function updateEmployeeRequest(
   return result.getValue()
 }
 
+async function authorizeStatusTransition(
+  user: EnrichedUser,
+  currentStatus: EmployeeRequestStatus,
+  targetStatus: EmployeeRequestStatus,
+  employeeRequest: { departmentId?: number | null; createdBy: number }
+): Promise<void> {
+  const { roleName, managedDepartmentIds, headOfDivisionIds, employeeId } = user
+
+  // Admin can do everything
+  if (roleName === 'admin') return
+
+  const currentTransition = WORKFLOW_TRANSITIONS[currentStatus]
+  if (!currentTransition) {
+    throw new ForbiddenError('Invalid status transition')
+  }
+
+  const allowedRoles = currentTransition.allowedRoles
+
+  // Check Manager role (structural — based on department)
+  if (allowedRoles.includes('manager')) {
+    if (!employeeId) {
+      throw new ForbiddenError('User account is not linked to an employee record')
+    }
+    const deptId = employeeRequest.departmentId
+    if (deptId && managedDepartmentIds.includes(deptId)) return
+  }
+
+  // Check HOD role (structural — based on division)
+  if (allowedRoles.includes('hod')) {
+    if (!employeeId) {
+      throw new ForbiddenError('User account is not linked to an employee record')
+    }
+    const deptId = employeeRequest.departmentId
+    if (deptId) {
+      const dept = await prisma.department.findUnique({
+        where: { id: deptId },
+        select: { divisionId: true },
+      })
+      if (dept && headOfDivisionIds.includes(dept.divisionId)) return
+    }
+  }
+
+  // Check role-based roles (HR, Management)
+  if (allowedRoles.includes(roleName)) return
+
+  throw new ForbiddenError('You do not have permission to perform this action')
+}
+
 export async function updateEmployeeRequestStatus(
   id: number,
   newStatus: string,
-  userId: number,
+  user: EnrichedUser,
   comment?: string
 ): Promise<EmployeeRequestWithRelations> {
   // Check if employee request exists
@@ -166,27 +268,54 @@ export async function updateEmployeeRequestStatus(
     throw new ConflictError(`Cannot transition from ${currentStatus} to ${targetStatus}`)
   }
 
-  // Convert target status to integer for DB
-  const statusInt = STATUS_REVERSE_MAP[targetStatus] ?? 0
+  // Authorize the user for this transition
+  await authorizeStatusTransition(user, currentStatus, targetStatus, existing)
+
+  // Re-validate budget when submitting (draft/revise → created)
+  if (targetStatus === EMPLOYEE_REQUEST_STATUS.CREATED) {
+    await validateBudgetForRequest(existing.jobTitleId)
+  }
+
+  // Build audit trail data
+  const auditData: Record<string, unknown> = {}
+  const now = new Date()
+
+  if (targetStatus === EMPLOYEE_REQUEST_STATUS.HOD_REVIEWED) {
+    auditData.hodReviewedBy = user.userId
+    auditData.hodReviewedAt = now
+  } else if (targetStatus === EMPLOYEE_REQUEST_STATUS.REVIEWED) {
+    auditData.hrReviewedBy = user.userId
+    auditData.hrReviewedAt = now
+  } else if (targetStatus === EMPLOYEE_REQUEST_STATUS.APPROVED) {
+    auditData.approvedBy = user.userId
+    auditData.approvedAt = now
+  } else if (targetStatus === EMPLOYEE_REQUEST_STATUS.REVISE) {
+    auditData.revisedBy = user.userId
+    auditData.revisedAt = now
+  } else if (targetStatus === EMPLOYEE_REQUEST_STATUS.REJECTED) {
+    auditData.rejectedBy = user.userId
+    auditData.rejectedAt = now
+  } else if (targetStatus === EMPLOYEE_REQUEST_STATUS.CREATED && currentStatus === EMPLOYEE_REQUEST_STATUS.REVISE) {
+    // Resubmit — reset all audit columns
+    auditData.hodReviewedBy = null
+    auditData.hodReviewedAt = null
+    auditData.hrReviewedBy = null
+    auditData.hrReviewedAt = null
+    auditData.approvedBy = null
+    auditData.approvedAt = null
+    auditData.revisedBy = null
+    auditData.revisedAt = null
+  }
 
   // Prepare update data
-  const updateData: {
-    statusEmployeeRequest: number
-    codeRecruitment?: string
-    reviewedAt?: Date
-    approvedAt?: Date
-  } = { statusEmployeeRequest: statusInt }
+  const updateData = {
+    statusEmployeeRequest: STATUS_REVERSE_MAP[targetStatus] ?? 0,
+    ...auditData,
+  } as Record<string, unknown>
 
   // Generate recruitment code when starting recruitment
   if (targetStatus === EMPLOYEE_REQUEST_STATUS.IN_RECRUITMENT) {
     updateData.codeRecruitment = await employeeRequestRepository.generateRecruitmentCode()
-  }
-
-  // Set timestamp based on status
-  if (targetStatus === EMPLOYEE_REQUEST_STATUS.REVIEWED) {
-    updateData.reviewedAt = new Date()
-  } else if (targetStatus === EMPLOYEE_REQUEST_STATUS.APPROVED) {
-    updateData.approvedAt = new Date()
   }
 
   const result = await employeeRequestRepository.update(id, updateData)
@@ -198,7 +327,7 @@ export async function updateEmployeeRequestStatus(
   // Add comment for status change
   const commentText = comment || `Status changed from ${currentStatus} to ${newStatus}`
   await employeeRequestRepository.addComment(id, {
-    userId,
+    userId: user.userId,
     comment: commentText
   })
 
@@ -269,8 +398,8 @@ export async function deleteEmployeeRequest(id: number): Promise<void> {
   }
 }
 
-export async function getStats(): Promise<Record<string, number>> {
-  const result = await employeeRequestRepository.getStats()
+export async function getStats(roleFilter?: RoleFilter): Promise<Record<string, number>> {
+  const result = await employeeRequestRepository.getStats(roleFilter)
 
   if (result.isFailure()) {
     throw new Error(result.error)
@@ -279,7 +408,7 @@ export async function getStats(): Promise<Record<string, number>> {
   return result.getValue()
 }
 
-export async function startRecruitment(id: number, userId: number): Promise<EmployeeRequestWithRelations> {
+export async function startRecruitment(id: number, user: EnrichedUser): Promise<EmployeeRequestWithRelations> {
   // Check if employee request exists and is approved
   const existingResult = await employeeRequestRepository.findById(id)
 
@@ -302,7 +431,7 @@ export async function startRecruitment(id: number, userId: number): Promise<Empl
   return updateEmployeeRequestStatus(
     id,
     EMPLOYEE_REQUEST_STATUS.IN_RECRUITMENT,
-    userId,
+    user,
     'Recruitment process started'
   )
 }
