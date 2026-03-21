@@ -105,8 +105,24 @@ export type UpdateEmployeeRequestData = {
   statusEmployeeRequest?: number
   statusRecruitment?: number
   codeRecruitment?: string
-  reviewedAt?: Date
   approvedAt?: Date
+  departmentId?: number | null
+  hodReviewedBy?: number | null
+  hodReviewedAt?: Date | null
+  hrReviewedBy?: number | null
+  hrReviewedAt?: Date | null
+  approvedBy?: number | null
+  revisedBy?: number | null
+  revisedAt?: Date | null
+  rejectedBy?: number | null
+  rejectedAt?: Date | null
+}
+
+export interface RoleFilter {
+  roleName: string
+  userId: number
+  managedDepartmentIds: number[]
+  hodDivisionIds: number[]
 }
 
 // Only include createdByUser - jobTitle and comments need manual lookups due to type mismatches
@@ -180,23 +196,72 @@ async function generateCode(): Promise<string> {
   return `${prefix}${String(sequence).padStart(4, '0')}`
 }
 
+function buildRoleWhereClause(roleFilter: RoleFilter): Record<string, unknown> {
+  const { roleName, userId, managedDepartmentIds, hodDivisionIds } = roleFilter
+
+  if (roleName === 'admin') return {}
+
+  if (roleName === 'manager') {
+    return { createdBy: userId }
+  }
+
+  if (roleName === 'hod') {
+    return {
+      OR: [
+        { createdBy: userId },
+        ...(hodDivisionIds.length > 0
+          ? [{ department: { divisionId: { in: hodDivisionIds } } }]
+          : []),
+      ],
+    }
+  }
+
+  if (roleName === 'hr') {
+    return {
+      OR: [
+        { createdBy: userId },
+        { statusEmployeeRequest: { in: [1, 8, 2, 3, 4, 5, 6, 7] } },
+      ],
+    }
+  }
+
+  if (roleName === 'management') {
+    return {
+      OR: [
+        { createdBy: userId },
+        { statusEmployeeRequest: { in: [2, 3, 4, 5, 6, 7] } },
+      ],
+    }
+  }
+
+  return { createdBy: userId }
+}
+
 export async function findAll(
   filters: EmployeeRequestFilters,
-  pagination: PaginationParams
+  pagination: PaginationParams,
+  roleFilter?: RoleFilter
 ): Promise<RepositoryResult<PaginatedResult>> {
   try {
+    const roleWhere = roleFilter ? buildRoleWhereClause(roleFilter) : {}
+
     const where: Prisma.EmployeeRequestWhereInput = {
       isDeleted: 0,
       ...(filters.status && { statusEmployeeRequest: STATUS_REVERSE_MAP[filters.status] ?? 0 }),
       ...(filters.jobTitleId && { jobTitleId: filters.jobTitleId }),
       ...(filters.requestedById && { createdBy: filters.requestedById }),
-      ...(filters.search && {
-        OR: [
-          { code: { contains: filters.search } },
-          { purpose: { contains: filters.search } },
-          { reason: { contains: filters.search } }
-        ]
-      })
+      AND: [
+        ...(filters.search
+          ? [{
+              OR: [
+                { code: { contains: filters.search } },
+                { purpose: { contains: filters.search } },
+                { reason: { contains: filters.search } }
+              ]
+            }]
+          : []),
+        ...(Object.keys(roleWhere).length > 0 ? [roleWhere] : []),
+      ],
     }
 
     const [rawItems, total] = await prisma.$transaction([
@@ -301,7 +366,7 @@ export async function create(data: CreateEmployeeRequestData): Promise<Repositor
 
 export async function update(id: number, data: UpdateEmployeeRequestData): Promise<RepositoryResult<EmployeeRequestWithRelations>> {
   try {
-    const updateData: Prisma.EmployeeRequestUpdateInput = {}
+    const updateData: Prisma.EmployeeRequestUncheckedUpdateInput = {}
 
     if (data.jobTitleId !== undefined) updateData.jobTitleId = data.jobTitleId
     if (data.reason !== undefined) updateData.reason = data.reason
@@ -322,8 +387,17 @@ export async function update(id: number, data: UpdateEmployeeRequestData): Promi
     if (data.statusEmployeeRequest !== undefined) updateData.statusEmployeeRequest = data.statusEmployeeRequest
     if (data.statusRecruitment !== undefined) updateData.statusRecruitment = data.statusRecruitment
     if (data.codeRecruitment !== undefined) updateData.codeRecruitment = data.codeRecruitment
-    if (data.reviewedAt !== undefined) updateData.reviewedAt = data.reviewedAt
     if (data.approvedAt !== undefined) updateData.approvedAt = data.approvedAt
+    if (data.departmentId !== undefined) updateData.departmentId = data.departmentId
+    if (data.hodReviewedBy !== undefined) updateData.hodReviewedBy = data.hodReviewedBy
+    if (data.hodReviewedAt !== undefined) updateData.hodReviewedAt = data.hodReviewedAt
+    if (data.hrReviewedBy !== undefined) updateData.hrReviewedBy = data.hrReviewedBy
+    if (data.hrReviewedAt !== undefined) updateData.hrReviewedAt = data.hrReviewedAt
+    if (data.approvedBy !== undefined) updateData.approvedBy = data.approvedBy
+    if (data.revisedBy !== undefined) updateData.revisedBy = data.revisedBy
+    if (data.revisedAt !== undefined) updateData.revisedAt = data.revisedAt
+    if (data.rejectedBy !== undefined) updateData.rejectedBy = data.rejectedBy
+    if (data.rejectedAt !== undefined) updateData.rejectedAt = data.rejectedAt
     updateData.updatedAt = new Date()
 
     const employeeRequest = await prisma.employeeRequest.update({
@@ -386,11 +460,16 @@ export async function addComment(
   }
 }
 
-export async function getStats(): Promise<RepositoryResult<Record<string, number>>> {
+export async function getStats(roleFilter?: RoleFilter): Promise<RepositoryResult<Record<string, number>>> {
   try {
+    const roleWhere = roleFilter ? buildRoleWhereClause(roleFilter) : {}
+
     const stats = await prisma.employeeRequest.groupBy({
       by: ['statusEmployeeRequest'],
-      where: { isDeleted: 0 },
+      where: {
+        isDeleted: 0,
+        ...(Object.keys(roleWhere).length > 0 ? { AND: [roleWhere] } : {}),
+      },
       _count: { statusEmployeeRequest: true }
     })
 
