@@ -1,15 +1,27 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
+import { prisma } from '../config/database.js'
 import { JWT_CONFIG } from '../config/jwt.js'
 import { AUTH_CONSTANTS } from '../constants/authConstants.js'
+import { normalizeRoleName } from '../constants/roleConstants.js'
 import { AppError, ConflictError, UnauthorizedError } from '../errors/index.js'
 import * as userRepository from '../repositories/userRepository.js'
 import type { LoginBody, RegisterBody } from '../schemas/authSchemas.js'
 import type { JwtTokenPayload } from '../middlewares/authMiddleware.js'
 
+export interface ManagedDepartment {
+  id: number
+  name: string
+}
+
+export interface AuthUser extends Omit<userRepository.UserWithoutPassword, never> {
+  roleName: string
+  managedDepartments: ManagedDepartment[]
+}
+
 export interface AuthResult {
-  user: userRepository.UserWithoutPassword
+  user: AuthUser
   token: string
 }
 
@@ -65,10 +77,27 @@ export async function login(data: LoginBody): Promise<AuthResult> {
 
   const { password: _, ...userWithoutPassword } = user
 
-  return { user: userWithoutPassword, token }
+  const [role, employeeData] = await Promise.all([
+    prisma.role.findUnique({ where: { roleId: user.roleId }, select: { roleName: true } }),
+    user.employeeId
+      ? prisma.employee.findUnique({
+          where: { employeeId: user.employeeId },
+          select: { managedDepartments: { select: { id: true, name: true } } }
+        })
+      : null
+  ])
+
+  return {
+    user: {
+      ...userWithoutPassword,
+      roleName: normalizeRoleName(role?.roleName ?? ''),
+      managedDepartments: employeeData?.managedDepartments ?? []
+    },
+    token
+  }
 }
 
-export async function getCurrentUser(userId: number): Promise<userRepository.UserWithoutPassword> {
+export async function getCurrentUser(userId: number): Promise<AuthUser> {
   const userResult = await userRepository.findById(userId)
 
   if (userResult.isFailure()) {
@@ -81,7 +110,21 @@ export async function getCurrentUser(userId: number): Promise<userRepository.Use
     throw new UnauthorizedError('User not found')
   }
 
-  return user
+  const [role, employeeData] = await Promise.all([
+    prisma.role.findUnique({ where: { roleId: user.roleId }, select: { roleName: true } }),
+    user.employeeId
+      ? prisma.employee.findUnique({
+          where: { employeeId: user.employeeId },
+          select: { managedDepartments: { select: { id: true, name: true } } }
+        })
+      : null
+  ])
+
+  return {
+    ...user,
+    roleName: normalizeRoleName(role?.roleName ?? ''),
+    managedDepartments: employeeData?.managedDepartments ?? []
+  }
 }
 
 function generateToken(payload: JwtTokenPayload): string {
