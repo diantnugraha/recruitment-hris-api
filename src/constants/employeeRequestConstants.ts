@@ -72,21 +72,18 @@ export const WORKFLOW_TRANSITIONS: Record<EmployeeRequestStatus, {
 }> = {
   draft: {
     nextStatuses: ['created'],
-    allowedRoles: ['manager', 'head', 'admin'],
+    allowedRoles: ['manager', 'admin'],
   },
   created: {
-    // HOD Review: HOD can approve to hod_reviewed or request revise
     nextStatuses: ['hod_reviewed', 'revise'],
-    allowedRoles: ['hod', 'head', 'admin'],
+    allowedRoles: ['hod', 'admin'],
   },
   hod_reviewed: {
-    // HR Review: HR can approve to reviewed or request revise
     nextStatuses: ['reviewed', 'revise'],
     allowedRoles: ['hr', 'admin'],
   },
   reviewed: {
-    // Management Approval: Management can approve or reject
-    nextStatuses: ['approved', 'rejected'],
+    nextStatuses: ['approved', 'rejected', 'revise'],
     allowedRoles: ['management', 'admin'],
   },
   approved: {
@@ -99,7 +96,7 @@ export const WORKFLOW_TRANSITIONS: Record<EmployeeRequestStatus, {
   },
   revise: {
     nextStatuses: ['created'],
-    allowedRoles: ['manager', 'head', 'admin'],
+    allowedRoles: ['manager', 'admin'],
   },
   in_recruitment: {
     nextStatuses: ['completed'],
