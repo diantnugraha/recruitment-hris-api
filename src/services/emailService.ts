@@ -6,6 +6,7 @@ import formData from 'form-data'
 export type WelcomeEmailData = {
   email: string
   displayName: string
+  password?: string
 }
 
 export type CandidateInvitationEmailData = {
@@ -180,19 +181,127 @@ function getCandidateInvitationTemplate(data: CandidateInvitationEmailData & { c
 
 // --- Email Functions ---
 
+function getWelcomeEmailTemplate(data: WelcomeEmailData & { companyName: string, frontendUrl: string }): string {
+  const credentialsSection = data.password ? `
+              <!-- Login Credentials Card -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #fef3c7; border-radius: 8px; border: 1px solid #fbbf24;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px 0; color: #92400e; font-size: 14px; font-weight: 600;">
+                      Your Login Credentials
+                    </p>
+                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
+                      <strong>Email:</strong> ${data.email}
+                    </p>
+                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
+                      <strong>Password:</strong> <code style="background-color: #ffffff; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">${data.password}</code>
+                    </p>
+                    <p style="margin: 12px 0 0 0; color: #92400e; font-size: 12px;">
+                      Please change your password after your first login for security purposes.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+  ` : ''
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to ${data.companyName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #6366f1; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
+                ${data.companyName}
+              </h1>
+              <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 14px;">
+                HRIS Portal
+              </p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
+                Welcome ${data.displayName}!
+              </h2>
+
+              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Your HRIS account has been created successfully. You can now access the system to manage your employee information.
+              </p>
+
+              ${credentialsSection}
+
+              <!-- CTA Button -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <a href="${data.frontendUrl}/login"
+                       style="display: inline-block; padding: 14px 32px; background-color: #6366f1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
+                      Login to HRIS
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                If the button above doesn't work, you can copy and paste the following link into your browser:
+              </p>
+              <p style="margin: 8px 0 20px 0; word-break: break-all; color: #6366f1; font-size: 14px;">
+                ${data.frontendUrl}/login
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+              <p style="margin: 0; color: #9ca3af; font-size: 14px;">
+                If you have any questions, please contact the HR department.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} ${data.companyName}. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `
+}
+
 export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
   const config = getEmailConfig()
   const mg = getMailgunClient()
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+
+  const html = getWelcomeEmailTemplate({
+    ...data,
+    companyName: config.companyName,
+    frontendUrl,
+  })
 
   await mg.messages.create(config.domain, {
     from: `${config.companyName} <${config.from}>`,
     to: data.email,
-    subject: `Welcome to ${config.companyName}`,
-    html: `
-      <h1>Welcome ${data.displayName}!</h1>
-      <p>Your account has been created successfully.</p>
-      <p>You can now login to the system.</p>
-    `,
+    subject: `Welcome to ${config.companyName} - Your HRIS Account`,
+    html,
   })
 
   console.log(`[MAILGUN] Welcome email sent to ${data.email}`)

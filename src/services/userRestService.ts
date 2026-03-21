@@ -107,7 +107,8 @@ export async function createUser(data: CreateUserServiceData): Promise<UserWitho
   emailService
     .sendWelcomeEmail({
       email: user.email,
-      displayName: user.displayName
+      displayName: user.displayName,
+      password: data.password
     })
     .catch((error) => {
       console.error('Failed to send welcome email:', error)

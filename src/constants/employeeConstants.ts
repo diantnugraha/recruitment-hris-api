@@ -8,6 +8,7 @@ export const EMPLOYEE_STATUS = {
 export type EmployeeStatus = typeof EMPLOYEE_STATUS[keyof typeof EMPLOYEE_STATUS]
 
 export const EMPLOYEE_GENDER = {
+  ANY: 'Any',
   MALE: 'Male',
   FEMALE: 'Female'
 } as const

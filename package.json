@@ -25,13 +25,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.967.0",
-    "@aws-sdk/s3-request-presigner": "^3.967.0",
+    "@aws-sdk/client-s3": "^3.893.0",
+    "@aws-sdk/s3-request-presigner": "^3.893.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/multipart": "^9.4.0",
     "@prisma/client": "^5.22.0",
     "@sinclair/typebox": "^0.34.33",
+    "@types/pdfkit": "^0.17.5",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.4",
     "fastify": "^5.7.4",
@@ -39,6 +40,7 @@
     "jsonwebtoken": "^9.0.2",
     "mailgun.js": "^12.7.0",
     "mysql2": "^3.16.3",
+    "pdfkit": "^0.18.0",
     "prisma": "^5.22.0"
   },
   "devDependencies": {
@@ -50,5 +52,8 @@
   },
   "engines": {
     "node": ">=24.0.0"
+  },
+  "overrides": {
+    "fast-xml-parser": "5.5.8"
   }
 }

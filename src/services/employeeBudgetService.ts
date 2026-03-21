@@ -5,7 +5,8 @@ import { EMPLOYEE_BUDGET_ERRORS, CURRENT_YEAR } from '../constants/employeeBudge
 import type {
   EmployeeBudgetWithRelations,
   EmployeeBudgetFilters,
-  PaginationParams
+  PaginationParams,
+  EmployeeCountByCategory
 } from '../repositories/employeeBudgetRepository.js'
 
 export type CreateEmployeeBudgetServiceData = {
@@ -13,7 +14,8 @@ export type CreateEmployeeBudgetServiceData = {
   year: number
   technical: number
   admin: number
-  document?: string
+  document?: string | null
+  documentName?: string | null
 }
 
 export type UpdateEmployeeBudgetServiceData = {
@@ -21,7 +23,8 @@ export type UpdateEmployeeBudgetServiceData = {
   year?: number
   technical?: number
   admin?: number
-  document?: string
+  document?: string | null
+  documentName?: string | null
 }
 
 export type PaginatedEmployeeBudgets = {
@@ -49,6 +52,15 @@ export type BudgetSummaryItem = {
     admin: number
     total: number
   }
+}
+
+export type RestBudgetData = {
+  departmentId: number
+  year: number
+  budget: { technical: number; admin: number; total: number }
+  activeEmployees: { technical: number; admin: number; total: number }
+  pendingRequests: { technical: number; admin: number; total: number }
+  rest: { technical: number; admin: number; total: number }
 }
 
 function calculateGrowth(current: number, previous: number): number {
@@ -264,4 +276,146 @@ export async function getBudgetSummary(year?: number): Promise<BudgetSummaryItem
   summary.sort((a, b) => a.departmentName.localeCompare(b.departmentName))
 
   return summary
+}
+
+export async function getRestBudget(departmentId: number, year?: number): Promise<RestBudgetData> {
+  const targetYear = year ?? CURRENT_YEAR
+
+  // Validate department exists
+  const deptResult = await departmentRepository.findById(departmentId)
+  if (deptResult.isFailure()) {
+    throw new Error(deptResult.getError())
+  }
+  if (!deptResult.getValue()) {
+    throw new ValidationError(EMPLOYEE_BUDGET_ERRORS.DEPARTMENT_NOT_FOUND)
+  }
+
+  // Fetch budget allocation, active employees, and pending requests in parallel
+  const [budgetResult, activeResult, pendingResult] = await Promise.all([
+    employeeBudgetRepository.findByDepartmentAndYear(departmentId, targetYear),
+    employeeBudgetRepository.countActiveEmployeesByDeptAndCategory(departmentId),
+    employeeBudgetRepository.sumPendingRequestsByDeptAndCategory(departmentId)
+  ])
+
+  if (budgetResult.isFailure()) throw new Error(budgetResult.getError())
+  if (activeResult.isFailure()) throw new Error(activeResult.getError())
+  if (pendingResult.isFailure()) throw new Error(pendingResult.getError())
+
+  const budget = budgetResult.getValue()
+  const active = activeResult.getValue()
+  const pending = pendingResult.getValue()
+
+  const budgetTechnical = budget?.technical ?? 0
+  const budgetAdmin = budget?.admin ?? 0
+
+  const restTechnical = budgetTechnical - active.technical - pending.technical
+  const restAdmin = budgetAdmin - active.admin - pending.admin
+
+  return {
+    departmentId,
+    year: targetYear,
+    budget: {
+      technical: budgetTechnical,
+      admin: budgetAdmin,
+      total: budgetTechnical + budgetAdmin
+    },
+    activeEmployees: {
+      technical: active.technical,
+      admin: active.admin,
+      total: active.technical + active.admin
+    },
+    pendingRequests: {
+      technical: pending.technical,
+      admin: pending.admin,
+      total: pending.technical + pending.admin
+    },
+    rest: {
+      technical: restTechnical,
+      admin: restAdmin,
+      total: restTechnical + restAdmin
+    }
+  }
+}
+
+export async function uploadDocument(
+  budgetId: number,
+  fileBuffer: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<{ url: string; name: string }> {
+  const { uploadToS3 } = await import('../config/s3.js')
+
+  const existingResult = await employeeBudgetRepository.findById(budgetId)
+  if (existingResult.isFailure()) {
+    throw new Error(existingResult.getError())
+  }
+
+  const existing = existingResult.getValue()
+  if (!existing) {
+    throw new NotFoundError(EMPLOYEE_BUDGET_ERRORS.NOT_FOUND)
+  }
+
+  // Delete old document from S3 if exists
+  if (existing.document) {
+    const { deleteFromS3 } = await import('../config/s3.js')
+    const urlObj = new URL(existing.document)
+    const oldKey = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname
+    await deleteFromS3(oldKey)
+  }
+
+  const timestamp = Date.now()
+  const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const s3Key = `employee-budget-documents/${budgetId}/${timestamp}_${sanitizedName}`
+
+  const url = await uploadToS3(s3Key, fileBuffer, contentType)
+
+  const updateResult = await employeeBudgetRepository.updateDocument(budgetId, url, fileName)
+  if (updateResult.isFailure()) {
+    throw new Error(updateResult.getError())
+  }
+
+  return { url, name: fileName }
+}
+
+export async function getDocument(
+  budgetId: number
+): Promise<{ url: string | null; name: string | null; presignedUrl: string | null }> {
+  const docResult = await employeeBudgetRepository.getDocument(budgetId)
+  if (docResult.isFailure()) {
+    throw new Error(docResult.getError())
+  }
+
+  const doc = docResult.getValue()
+  if (!doc || !doc.url) {
+    return { url: null, name: null, presignedUrl: null }
+  }
+
+  const { getPresignedUrl } = await import('../config/s3.js')
+  const urlObj = new URL(doc.url)
+  const s3Key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname
+  const presignedUrl = await getPresignedUrl(s3Key)
+
+  return { url: doc.url, name: doc.name, presignedUrl }
+}
+
+export async function deleteDocument(budgetId: number): Promise<void> {
+  const docResult = await employeeBudgetRepository.getDocument(budgetId)
+  if (docResult.isFailure()) {
+    throw new Error(docResult.getError())
+  }
+
+  const doc = docResult.getValue()
+  if (!doc || !doc.url) {
+    throw new NotFoundError('No document found for this budget')
+  }
+
+  const { deleteFromS3 } = await import('../config/s3.js')
+  const urlObj = new URL(doc.url)
+  const s3Key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname
+  await deleteFromS3(s3Key)
+
+  const updateResult = await employeeBudgetRepository.updateDocument(budgetId, null, null)
+  if (updateResult.isFailure()) {
+    throw new Error(updateResult.getError())
+  }
 }

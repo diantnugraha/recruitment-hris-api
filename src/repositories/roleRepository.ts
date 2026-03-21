@@ -113,6 +113,19 @@ export async function remove(id: number): Promise<RepositoryResult<boolean>> {
   }
 }
 
+export async function findByName(name: string): Promise<RepositoryResult<Role | null>> {
+  try {
+    const role = await prisma.role.findFirst({
+      where: { roleName: name },
+      select: roleSelectFields
+    })
+    return success(role)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to find role by name'
+    return failure(message)
+  }
+}
+
 export async function nameExists(name: string): Promise<RepositoryResult<boolean>> {
   try {
     const role = await prisma.role.findFirst({

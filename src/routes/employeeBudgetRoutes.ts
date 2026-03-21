@@ -8,10 +8,12 @@ import {
   CreateEmployeeBudgetBodySchema,
   UpdateEmployeeBudgetBodySchema,
   SummaryQuerySchema,
+  RestBudgetQuerySchema,
   type EmployeeBudgetQuery,
   type CreateEmployeeBudgetBody,
   type UpdateEmployeeBudgetBody,
-  type SummaryQuery
+  type SummaryQuery,
+  type RestBudgetQuery
 } from '../schemas/employeeBudgetSchemas.js'
 
 export async function employeeBudgetRoutes(app: FastifyInstance): Promise<void> {
@@ -22,6 +24,13 @@ export async function employeeBudgetRoutes(app: FastifyInstance): Promise<void> 
     '/summary',
     { schema: { querystring: SummaryQuerySchema } },
     employeeBudgetController.getSummary
+  )
+
+  // Get rest budget for a department (must be before /:id to avoid conflict)
+  app.get<{ Querystring: RestBudgetQuery }>(
+    '/rest-budget',
+    { schema: { querystring: RestBudgetQuerySchema } },
+    employeeBudgetController.getRestBudget
   )
 
   // Get all employee budgets
@@ -62,5 +71,26 @@ export async function employeeBudgetRoutes(app: FastifyInstance): Promise<void> 
     '/:id',
     { schema: { params: IdParamSchema } },
     employeeBudgetController.remove
+  )
+
+  // Upload document support
+  app.post<{ Params: IdParam }>(
+    '/:id/document',
+    { schema: { params: IdParamSchema } },
+    employeeBudgetController.uploadDocument
+  )
+
+  // Get document support (with presigned URL)
+  app.get<{ Params: IdParam }>(
+    '/:id/document',
+    { schema: { params: IdParamSchema } },
+    employeeBudgetController.getDocument
+  )
+
+  // Delete document support
+  app.delete<{ Params: IdParam }>(
+    '/:id/document',
+    { schema: { params: IdParamSchema } },
+    employeeBudgetController.deleteDocument
   )
 }

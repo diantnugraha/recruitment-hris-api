@@ -15,6 +15,7 @@ export const EmployeeStatusSchema = Type.Union([
 ])
 
 export const EmployeeGenderSchema = Type.Union([
+  Type.Literal(EMPLOYEE_GENDER.ANY),
   Type.Literal(EMPLOYEE_GENDER.MALE),
   Type.Literal(EMPLOYEE_GENDER.FEMALE)
 ])

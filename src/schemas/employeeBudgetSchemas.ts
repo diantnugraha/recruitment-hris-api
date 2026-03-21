@@ -43,3 +43,10 @@ export const SummaryQuerySchema = Type.Object({
 })
 
 export type SummaryQuery = Static<typeof SummaryQuerySchema>
+
+export const RestBudgetQuerySchema = Type.Object({
+  department_id: Type.Integer({ minimum: 1 }),
+  year: Type.Optional(Type.Integer({ minimum: MIN_BUDGET_YEAR, maximum: MAX_BUDGET_YEAR }))
+})
+
+export type RestBudgetQuery = Static<typeof RestBudgetQuerySchema>

@@ -1,9 +1,14 @@
+import { randomBytes } from 'crypto'
 import type { Employee } from '@prisma/client'
 
 import { NotFoundError, ConflictError, ValidationError } from '../errors/index.js'
 import * as employeeRepository from '../repositories/employeeRepository.js'
 import type { EmployeeFilters, PaginationParams } from '../repositories/employeeRepository.js'
 import { updateStructuralPosition, clearStructuralPositions } from './organizationService.js'
+import * as userRestService from './userRestService.js'
+import * as roleRepository from '../repositories/roleRepository.js'
+
+const DEFAULT_EMPLOYEE_ROLE_NAME = 'Employee'
 
 export type CreateEmployeeServiceData = {
   name: string
@@ -149,7 +154,46 @@ export async function createEmployee(data: CreateEmployeeServiceData): Promise<E
     await updateStructuralPosition(employee.employeeId, data.title, data.departmentId)
   }
 
+  // Auto-create user account if employee has email
+  if (data.email) {
+    autoCreateUserForEmployee(employee, data.email, data.name)
+  }
+
   return employee
+}
+
+function generateRandomPassword(): string {
+  return randomBytes(6).toString('base64url').slice(0, 10)
+}
+
+async function resolveEmployeeRoleId(): Promise<number | undefined> {
+  const roleResult = await roleRepository.findByName(DEFAULT_EMPLOYEE_ROLE_NAME)
+
+  if (roleResult.isFailure()) return undefined
+
+  const role = roleResult.getValue()
+  return role?.roleId
+}
+
+function autoCreateUserForEmployee(employee: Employee, email: string, name: string): void {
+  const plainPassword = generateRandomPassword()
+
+  resolveEmployeeRoleId()
+    .then((roleId) => {
+      return userRestService.createUser({
+        displayName: name,
+        email,
+        name,
+        password: plainPassword,
+        roleId,
+        employeeId: employee.employeeId,
+        superiorId: employee.employeeSuperiorId ?? undefined
+      })
+    })
+    .catch((error) => {
+      // Don't fail employee creation if user creation fails (e.g. email already exists)
+      console.error(`[AUTO-USER] Failed to create user for employee ${employee.employeeId}:`, error instanceof Error ? error.message : error)
+    })
 }
 
 export async function updateEmployee(id: number, data: UpdateEmployeeServiceData): Promise<Employee> {

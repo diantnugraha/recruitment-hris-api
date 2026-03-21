@@ -9,11 +9,11 @@ export async function getAll(
   request: FastifyRequest<{ Querystring: ObsQuery }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { page = 1, limit = 20, name, code } = request.query
+  const { page = 1, limit = 20, name, cluster } = request.query
 
   const filters = {
     ...(name && { name }),
-    ...(code && { code })
+    ...(cluster && { cluster })
   }
 
   const pagination = { page, limit }
@@ -40,11 +40,11 @@ export async function create(
   request: FastifyRequest<{ Body: CreateObsBody }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { name, code, description } = request.body
+  const { name, cluster, description } = request.body
 
   const data = {
     name,
-    ...(code && { code }),
+    ...(cluster && { cluster }),
     ...(description && { description })
   }
 
@@ -58,11 +58,11 @@ export async function update(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { name, code, description } = request.body
+  const { name, cluster, description } = request.body
 
   const data = {
     ...(name && { name }),
-    ...(code !== undefined && { code }),
+    ...(cluster !== undefined && { cluster }),
     ...(description !== undefined && { description })
   }
 

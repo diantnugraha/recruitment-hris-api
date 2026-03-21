@@ -6,13 +6,13 @@ import type { ObsFilters, PaginationParams, ObsWithRelations } from '../reposito
 
 export type CreateObsServiceData = {
   name: string
-  code?: string
+  cluster?: string
   description?: string
 }
 
 export type UpdateObsServiceData = {
   name?: string
-  code?: string
+  cluster?: string
   description?: string
 }
 

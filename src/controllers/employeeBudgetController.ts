@@ -5,7 +5,8 @@ import type {
   EmployeeBudgetQuery,
   CreateEmployeeBudgetBody,
   UpdateEmployeeBudgetBody,
-  SummaryQuery
+  SummaryQuery,
+  RestBudgetQuery
 } from '../schemas/employeeBudgetSchemas.js'
 import * as employeeBudgetService from '../services/employeeBudgetService.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
@@ -96,4 +97,89 @@ export async function getSummary(
   const summary = await employeeBudgetService.getBudgetSummary(year)
 
   sendSuccess(reply, summary)
+}
+
+export async function getRestBudget(
+  request: FastifyRequest<{ Querystring: RestBudgetQuery }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { department_id, year } = request.query
+
+  const restBudget = await employeeBudgetService.getRestBudget(department_id, year)
+
+  sendSuccess(reply, restBudget)
+}
+
+const ALLOWED_DOCUMENT_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/jpg',
+]
+const MAX_DOCUMENT_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+export async function uploadDocument(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const file = await request.file()
+  if (!file) {
+    reply.status(400).send({ success: false, message: 'No file uploaded' })
+    return
+  }
+
+  if (!ALLOWED_DOCUMENT_TYPES.includes(file.mimetype)) {
+    reply.status(400).send({
+      success: false,
+      message: 'Invalid file type. Allowed: PDF, JPEG, PNG'
+    })
+    return
+  }
+
+  const chunks: Buffer[] = []
+  for await (const chunk of file.file) {
+    chunks.push(chunk)
+  }
+  const buffer = Buffer.concat(chunks)
+
+  if (buffer.length > MAX_DOCUMENT_FILE_SIZE) {
+    reply.status(400).send({
+      success: false,
+      message: 'File too large. Maximum size: 10MB'
+    })
+    return
+  }
+
+  const result = await employeeBudgetService.uploadDocument(
+    id,
+    buffer,
+    file.filename,
+    file.mimetype
+  )
+
+  sendSuccess(reply, result, 'Document uploaded successfully')
+}
+
+export async function getDocument(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  const document = await employeeBudgetService.getDocument(id)
+
+  sendSuccess(reply, document)
+}
+
+export async function deleteDocument(
+  request: FastifyRequest<{ Params: IdParam }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+
+  await employeeBudgetService.deleteDocument(id)
+
+  sendSuccess(reply, null, 'Document deleted successfully')
 }

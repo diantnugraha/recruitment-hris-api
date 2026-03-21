@@ -9,7 +9,7 @@ export type ObsWithRelations = Obs & {
 
 export type ObsFilters = {
   name?: string
-  code?: string
+  cluster?: string
 }
 
 export type PaginationParams = {
@@ -24,13 +24,13 @@ export type PaginatedResult = {
 
 export type CreateObsData = {
   name: string
-  code?: string
+  cluster?: string
   description?: string
 }
 
 export type UpdateObsData = {
   name?: string
-  code?: string
+  cluster?: string
   description?: string
 }
 
@@ -45,7 +45,7 @@ export async function findAll(
   try {
     const where: Prisma.ObsWhereInput = {
       ...(filters.name && { name: { contains: filters.name } }),
-      ...(filters.code && { code: { contains: filters.code } })
+      ...(filters.cluster && { cluster: { contains: filters.cluster } })
     }
 
     const [items, total] = await prisma.$transaction([
@@ -84,7 +84,7 @@ export async function create(data: CreateObsData): Promise<RepositoryResult<Obs>
     const obs = await prisma.obs.create({
       data: {
         name: data.name,
-        ...(data.code !== undefined && { code: data.code }),
+        ...(data.cluster !== undefined && { cluster: data.cluster }),
         ...(data.description !== undefined && { description: data.description })
       }
     })
@@ -101,7 +101,7 @@ export async function update(id: number, data: UpdateObsData): Promise<Repositor
       where: { id },
       data: {
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.code !== undefined && { code: data.code }),
+        ...(data.cluster !== undefined && { cluster: data.cluster }),
         ...(data.description !== undefined && { description: data.description }),
         updatedAt: new Date()
       }
