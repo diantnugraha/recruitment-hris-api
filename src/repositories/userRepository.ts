@@ -12,6 +12,10 @@ export type CreateUserData = {
 
 export type UserWithoutPassword = Omit<User, 'password'>
 
+export type UserWithRole = Omit<UserWithoutPassword, never> & {
+  role?: { roleName: string | null } | null
+}
+
 export async function findByEmail(email: string): Promise<RepositoryResult<User | null>> {
   try {
     const user = await prisma.user.findFirst({
@@ -24,7 +28,7 @@ export async function findByEmail(email: string): Promise<RepositoryResult<User 
   }
 }
 
-export async function findById(id: number): Promise<RepositoryResult<UserWithoutPassword | null>> {
+export async function findById(id: number): Promise<RepositoryResult<UserWithRole | null>> {
   try {
     const user = await prisma.user.findFirst({
       where: { id, trash: null },
@@ -41,7 +45,10 @@ export async function findById(id: number): Promise<RepositoryResult<UserWithout
         userImei: true,
         created_at: true,
         updated_at: true,
-        trash: true
+        trash: true,
+        role: {
+          select: { roleName: true },
+        },
       }
     })
     return success(user)

@@ -4,10 +4,16 @@ import jwt from 'jsonwebtoken'
 import { JWT_CONFIG } from '../config/jwt.js'
 import { UnauthorizedError } from '../errors/index.js'
 import { AUTH_CONSTANTS } from '../constants/authConstants.js'
+import { normalizeRoleName } from '../constants/roleConstants.js'
+import * as userRepository from '../repositories/userRepository.js'
 
-export interface JwtPayload {
+export interface JwtTokenPayload {
   userId: number
   email: string
+}
+
+export interface JwtPayload extends JwtTokenPayload {
+  roleName: string
 }
 
 declare module 'fastify' {
@@ -39,9 +45,23 @@ export async function authenticate(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_CONFIG.secret) as JwtPayload
-    request.user = decoded
-  } catch {
+    const decoded = jwt.verify(token, JWT_CONFIG.secret) as { userId: number; email: string }
+    const userResult = await userRepository.findById(decoded.userId)
+    if (userResult.isFailure()) {
+      throw new UnauthorizedError('User not found')
+    }
+    const user = userResult.getValue()
+    if (!user) {
+      throw new UnauthorizedError('User not found')
+    }
+    const roleName = normalizeRoleName(user.role?.roleName ?? '')
+    request.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      roleName,
+    }
+  } catch (error) {
+    if (error instanceof UnauthorizedError) throw error
     throw new UnauthorizedError('Invalid or expired token')
   }
 }

@@ -6,7 +6,7 @@ import { AUTH_CONSTANTS } from '../constants/authConstants.js'
 import { AppError, ConflictError, UnauthorizedError } from '../errors/index.js'
 import * as userRepository from '../repositories/userRepository.js'
 import type { LoginBody, RegisterBody } from '../schemas/authSchemas.js'
-import type { JwtPayload } from '../middlewares/authMiddleware.js'
+import type { JwtTokenPayload } from '../middlewares/authMiddleware.js'
 
 export interface AuthResult {
   user: userRepository.UserWithoutPassword
@@ -84,7 +84,7 @@ export async function getCurrentUser(userId: number): Promise<userRepository.Use
   return user
 }
 
-function generateToken(payload: JwtPayload): string {
+function generateToken(payload: JwtTokenPayload): string {
   return jwt.sign(payload, JWT_CONFIG.secret, {
     expiresIn: JWT_CONFIG.expiresIn
   })
