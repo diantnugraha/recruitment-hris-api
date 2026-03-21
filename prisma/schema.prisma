@@ -30,6 +30,12 @@ model User {
   employeeRequests        EmployeeRequest[]
   employeeRequestComments EmployeeRequestComment[]
 
+  hodReviewedRequests      EmployeeRequest[] @relation("HodReviewer")
+  hrReviewedRequests       EmployeeRequest[] @relation("HrReviewer")
+  approvedRequests         EmployeeRequest[] @relation("Approver")
+  revisedRequests          EmployeeRequest[] @relation("Reviser")
+  rejectedRequests         EmployeeRequest[] @relation("Rejecter")
+
   @@index([roleId], map: "roletouser_idx")
   @@map("users")
 }
@@ -112,7 +118,7 @@ model UserFile {
 model Obs {
   id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   name        String    @db.VarChar(255)
-  code        String?   @db.VarChar(50)
+  cluster     String?   @db.VarChar(100)
   description String?   @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
@@ -120,7 +126,7 @@ model Obs {
   divisions Division[]
 
   @@index([name])
-  @@index([code])
+  @@index([cluster])
   @@map("obs")
 }
 
@@ -160,11 +166,12 @@ model Department {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
 
-  division        Division             @relation(fields: [divisionId], references: [id])
-  manager         Employee?            @relation("DepartmentManager", fields: [managerId], references: [employeeId])
-  jobTitles       DepartmentJobTitle[]
-  employeeBudgets EmployeeBudget[]
-  employees       Employee[]
+  division         Division             @relation(fields: [divisionId], references: [id])
+  manager          Employee?            @relation("DepartmentManager", fields: [managerId], references: [employeeId])
+  jobTitles        DepartmentJobTitle[]
+  employeeBudgets  EmployeeBudget[]
+  employees        Employee[]
+  employeeRequests EmployeeRequest[]
 
   @@index([divisionId])
   @@map("departments")
@@ -247,7 +254,8 @@ model EmployeeBudget {
   year         Int
   technical    Int
   admin        Int
-  document     String    @db.VarChar(100)
+  document     String?   @db.Text
+  documentName String?   @map("document_name") @db.VarChar(255)
   createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
@@ -284,13 +292,28 @@ model EmployeeRequest {
   education             String                @db.VarChar(50)
   experience            String                @db.VarChar(50)
   budget                String                @db.VarChar(50)
-  reviewedAt            DateTime?             @map("reviewed_at") @db.Timestamp(0)
   approvedAt            DateTime?             @map("approved_at") @db.Timestamp(0)
   createdAt             DateTime?             @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt             DateTime?             @map("updated_at") @db.Timestamp(0)
+  departmentId          Int?                  @map("department_id")
+  hodReviewedBy         Int?                  @map("hod_reviewed_by")
+  hodReviewedAt         DateTime?             @map("hod_reviewed_at") @db.Timestamp(0)
+  hrReviewedBy          Int?                  @map("hr_reviewed_by")
+  hrReviewedAt          DateTime?             @map("hr_reviewed_at") @db.Timestamp(0)
+  approvedBy            Int?                  @map("approved_by")
+  revisedBy             Int?                  @map("revised_by")
+  revisedAt             DateTime?             @map("revised_at") @db.Timestamp(0)
+  rejectedBy            Int?                  @map("rejected_by")
+  rejectedAt            DateTime?             @map("rejected_at") @db.Timestamp(0)
 
   createdByUser User                     @relation(fields: [createdBy], references: [id])
   comments      EmployeeRequestComment[]
+  department    Department?              @relation(fields: [departmentId], references: [id])
+  hodReviewer   User?                    @relation("HodReviewer", fields: [hodReviewedBy], references: [id])
+  hrReviewer    User?                    @relation("HrReviewer", fields: [hrReviewedBy], references: [id])
+  approver      User?                    @relation("Approver", fields: [approvedBy], references: [id])
+  reviser       User?                    @relation("Reviser", fields: [revisedBy], references: [id])
+  rejecter      User?                    @relation("Rejecter", fields: [rejectedBy], references: [id])
 
   @@map("employee_request")
 }
