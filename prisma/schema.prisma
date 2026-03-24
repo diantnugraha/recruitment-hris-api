@@ -74,6 +74,7 @@ model Employee {
   employeeAddress       String?   @map("employee_alamat") @db.VarChar(255)
   employeeReligion      String?   @map("employee_religion") @db.VarChar(50)
   employeeEthnic        String?   @map("employee_ethnic") @db.VarChar(50)
+  employeeNationality   String?   @map("employee_nationality") @db.VarChar(50)
   employeeMother        String?   @map("employee_mother") @db.VarChar(100)
   employeeFather        String?   @map("employee_father") @db.VarChar(100)
   employeeSpouse        String?   @map("employee_spouse") @db.VarChar(100)
@@ -349,11 +350,11 @@ model CandidateRecruitment {
   verify              CandidateVerify
   token               String           @db.Text
   email               String           @db.VarChar(32)
-  fullname            String           @db.VarChar(32)
+  fullname            String           @db.VarChar(255)
   address             String           @db.Text
   resident_status     String           @db.VarChar(32)
   birth_place         String           @db.VarChar(32)
-  birth_date          DateTime         @db.Date
+  birth_date          DateTime?        @db.Date
   religion            String           @db.VarChar(32)
   ethnic_group        String?          @db.VarChar(32)
   id_no               String           @db.VarChar(32)

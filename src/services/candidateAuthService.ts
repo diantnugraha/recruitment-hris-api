@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import type { CandidateRecruitment } from '@prisma/client'
+import { prisma } from '../config/database.js'
 
 import { JWT_CONFIG } from '../config/jwt.js'
 import { AppError, UnauthorizedError, NotFoundError } from '../errors/index.js'
@@ -9,7 +10,7 @@ import type { CandidateLoginBody, CandidateProfileUpdate } from '../schemas/cand
 import type { CandidateJwtPayload } from '../middlewares/candidateAuthMiddleware.js'
 
 export interface CandidateAuthResult {
-  candidate: CandidateRecruitment & { candidateCode?: string }
+  candidate: CandidateRecruitment & { candidateCode?: string | undefined; jobTitleName?: string | undefined; isSubmitted?: boolean | undefined }
   token: string
 }
 
@@ -70,10 +71,21 @@ export async function login(data: CandidateLoginBody): Promise<CandidateAuthResu
     type: 'candidate'
   })
 
-  // Include candidate_code from detail
+  // Fetch job title name from detail
+  let jobTitleName: string | undefined
+  if (detail.job_title_id) {
+    const jobTitle = await prisma.jobTitle.findUnique({
+      where: { id: BigInt(detail.job_title_id) },
+      select: { name: true }
+    })
+    jobTitleName = jobTitle?.name?.trim() || undefined
+  }
+
   const candidateWithCode = {
     ...fullCandidate,
-    candidateCode: detail.candidate_code
+    candidateCode: detail.candidate_code,
+    jobTitleName,
+    isSubmitted: detail.candidate_verify === 'VERIFIED'
   }
 
   return { candidate: candidateWithCode, token: jwtToken }
@@ -104,7 +116,7 @@ export async function verifyPassword(email: string, password: string): Promise<b
   return verifyResult.getValue()
 }
 
-export async function getProfile(candidateId: number): Promise<CandidateRecruitment & { candidateCode?: string }> {
+export async function getProfile(candidateId: number): Promise<CandidateRecruitment & { candidateCode: string | undefined; jobTitleName: string | undefined; isSubmitted: boolean }> {
   const result = await candidateRepository.findById(candidateId)
 
   if (result.isFailure()) {
@@ -117,24 +129,33 @@ export async function getProfile(candidateId: number): Promise<CandidateRecruitm
     throw new NotFoundError('Candidate not found')
   }
 
-  // Debug: Log candidate data from repository
-  console.log('[DEBUG] getProfile - candidate from DB:', {
-    uniform_shirt_size: candidate.uniform_shirt_size,
-    uniform_pants_size: candidate.uniform_pants_size,
-    domicile_address: candidate.domicile_address,
-    driving_license: candidate.driving_license,
-  })
-
-  // Get candidate code from detail
+  // Get candidate code, job title, and submission status from detail
   const detailResult = await candidateDetailRepository.findByEmailWithDetail(candidate.email)
   let candidateCode: string | undefined
+  let jobTitleName: string | undefined
+
+  let isSubmitted = false
 
   if (detailResult.isSuccess()) {
     const { detail } = detailResult.getValue()
     candidateCode = detail?.candidate_code || undefined
+    isSubmitted = detail?.candidate_verify === 'VERIFIED'
+
+    // Fetch job title name from job_title_id
+    if (detail?.job_title_id) {
+      try {
+        const jobTitle = await prisma.jobTitle.findUnique({
+          where: { id: BigInt(detail.job_title_id) },
+          select: { name: true }
+        })
+        jobTitleName = jobTitle?.name?.trim() || undefined
+      } catch (err) {
+        console.error('[ERROR] getProfile - jobTitle query error:', err)
+      }
+    }
   }
 
-  return { ...candidate, candidateCode }
+  return { ...candidate, candidateCode, jobTitleName, isSubmitted }
 }
 
 export async function updateProfile(

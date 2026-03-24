@@ -1,5 +1,7 @@
 import Mailgun from 'mailgun.js'
 import formData from 'form-data'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 
 // --- Types ---
 
@@ -47,434 +49,332 @@ function getMailgunClient() {
 function getEmailConfig() {
   return {
     domain: process.env.MAILGUN_DOMAIN || '',
-    from: process.env.MAIL_FROM || 'noreply@company.com',
-    companyName: process.env.COMPANY_NAME || 'Company',
+    from: process.env.MAILGUN_FROM_EMAIL || '',
+    fromName: process.env.MAILGUN_FROM_NAME || '',
+    companyName: process.env.COMPANY_NAME || '',
+    contactEmail: process.env.COMPANY_CONTACT_EMAIL || '',
+    websiteUrl: process.env.COMPANY_WEBSITE_URL || '',
+    address: process.env.COMPANY_ADDRESS || '',
+    addressLine2: process.env.COMPANY_ADDRESS_LINE2 || '',
   }
+}
+
+// --- Logo ---
+
+function getLogoBase64(): string {
+  const candidates = [
+    resolve(process.cwd(), 'src', 'assets', 'tuv-nord-logo.png'),
+    resolve(process.cwd(), 'dist', 'assets', 'tuv-nord-logo.png'),
+  ]
+
+  for (const path of candidates) {
+    try {
+      const buffer = readFileSync(path)
+      return buffer.toString('base64')
+    } catch {
+      continue
+    }
+  }
+
+  return ''
+}
+
+// --- Base Email Layout ---
+
+function getBaseLayout(params: {
+  title: string
+  heading: string
+  greeting: string
+  bodyHtml: string
+}): string {
+  const config = getEmailConfig()
+  const year = new Date().getFullYear()
+  const logoBase64 = getLogoBase64()
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${params.title}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'Poppins', sans-serif !important; }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Poppins', sans-serif; background-color: #f0f0f0;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 16px;">
+        <!-- Main Card -->
+        <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);">
+
+          <!-- Logo -->
+          <tr>
+            <td style="padding: 36px 40px 20px 40px;">
+              <img src="data:image/png;base64,${logoBase64}" alt="TUV Nord" width="281" height="83" style="width: 200px; height: auto; display: block;">
+            </td>
+          </tr>
+
+          <!-- Heading -->
+          <tr>
+            <td style="padding: 0 40px 20px 40px;">
+              <h1 style="margin: 0; color: #1a1a1a; font-size: 22px; font-weight: 700;">
+                ${params.heading}
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 0 40px 8px 40px;">
+              <p style="margin: 0; color: #333333; font-size: 15px; line-height: 1.6;">
+                ${params.greeting}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 0 40px 24px 40px;">
+              ${params.bodyHtml}
+            </td>
+          </tr>
+
+          <!-- Contact & Sign-off -->
+          <tr>
+            <td style="padding: 0 40px 32px 40px;">
+              <p style="margin: 0 0 16px 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                For further clarifications, please contact <a href="mailto:${config.contactEmail}" style="color: #0032A0; text-decoration: none;">${config.contactEmail}</a>.
+              </p>
+              <p style="margin: 0 0 4px 0; color: #333333; font-size: 14px;">Regards,</p>
+              <p style="margin: 0 0 4px 0; color: #1a1a1a; font-size: 14px; font-weight: 700;">The T&Uuml;V Nord Central Team</p>
+              <a href="https://${config.websiteUrl}" style="color: #0032A0; font-size: 14px; text-decoration: none;">${config.websiteUrl}</a>
+            </td>
+          </tr>
+
+          <!-- Company Address Footer -->
+          <tr>
+            <td style="padding: 24px 40px; background-color: #f7f7f7;">
+              <p style="margin: 0 0 6px 0; color: #1a1a1a; font-size: 13px; font-weight: 700;">${config.companyName}</p>
+              <p style="margin: 0 0 2px 0; color: #888888; font-size: 12px;">Head Office</p>
+              <p style="margin: 0 0 2px 0; color: #888888; font-size: 12px;">${config.address}</p>
+              <p style="margin: 0; color: #888888; font-size: 12px;">${config.addressLine2}</p>
+            </td>
+          </tr>
+
+          <!-- Bottom Footer -->
+          <tr>
+            <td style="padding: 20px 40px; border-top: 1px solid #e8e8e8;">
+              <p style="margin: 0 0 8px 0; color: #999999; font-size: 11px; text-align: center;">
+                &copy; ${year} ${config.companyName}
+              </p>
+              <p style="margin: 0; color: #999999; font-size: 11px; text-align: center; line-height: 1.5;">
+                This email was automatically generated by the system. Please do not reply to this message.<br>
+                If you experience any issues, please contact <a href="mailto:${config.contactEmail}" style="color: #0032A0; text-decoration: none;">${config.contactEmail}</a>.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `
 }
 
 // --- Email Templates ---
 
 function getCandidateInvitationTemplate(data: CandidateInvitationEmailData & { companyName: string }): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Application Invitation</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #6366f1; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                ${data.companyName}
-              </h1>
-              <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 14px;">
-                Recruitment Portal
-              </p>
-            </td>
-          </tr>
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      We are pleased to invite you to apply for the following position at ${data.companyName}:
+    </p>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
-                Hello ${data.firstName} ${data.lastName},
-              </h2>
+    <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Position</p>
+    <p style="margin: 0 0 16px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.jobTitle}</p>
 
-              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                We are pleased to invite you to apply for the following position at ${data.companyName}:
-              </p>
+    <!-- Login Credentials -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #FFF8E1; border-radius: 8px; border: 1px solid #FFE082;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; color: #E65100; font-size: 13px; font-weight: 700;">Your Login Credentials</p>
+          <p style="margin: 0 0 6px 0; color: #333333; font-size: 14px;"><strong>Email:</strong> ${data.email}</p>
+          <p style="margin: 0 0 6px 0; color: #333333; font-size: 14px;"><strong>Password:</strong> <code style="background-color: #ffffff; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">${data.password}</code></p>
+          <p style="margin: 10px 0 0 0; color: #E65100; font-size: 11px;">Please keep your credentials secure and do not share them with anyone.</p>
+        </td>
+      </tr>
+    </table>
 
-              <!-- Position Card -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f9fafb; border-radius: 8px;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Position
-                    </p>
-                    <p style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
-                      ${data.jobTitle}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Department
-                    </p>
-                    <p style="margin: 0; color: #1f2937; font-size: 16px;">
-                      ${data.department}
-                    </p>
-                  </td>
-                </tr>
-              </table>
+    <p style="margin: 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Please click the button below to access our Candidate Portal and complete your application profile.
+    </p>
 
-              <!-- Login Credentials Card -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #fef3c7; border-radius: 8px; border: 1px solid #fbbf24;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 12px 0; color: #92400e; font-size: 14px; font-weight: 600;">
-                      Your Login Credentials
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
-                      <strong>Email:</strong> ${data.email}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
-                      <strong>Password:</strong> <code style="background-color: #ffffff; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">${data.password}</code>
-                    </p>
-                    <p style="margin: 12px 0 0 0; color: #92400e; font-size: 12px;">
-                      Please keep your credentials secure and do not share them with anyone.
-                    </p>
-                  </td>
-                </tr>
-              </table>
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.portalUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            Access Candidate Portal
+          </a>
+        </td>
+      </tr>
+    </table>
 
-              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Please click the button below to access our Candidate Portal and complete your application profile.
-              </p>
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${data.portalUrl}"
-                       style="display: inline-block; padding: 14px 32px; background-color: #6366f1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
-                      Access Candidate Portal
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                If the button above doesn't work, you can copy and paste the following link into your browser:
-              </p>
-              <p style="margin: 8px 0 20px 0; word-break: break-all; color: #6366f1; font-size: 14px;">
-                ${data.portalUrl}
-              </p>
-
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-              <p style="margin: 0; color: #9ca3af; font-size: 14px;">
-                If you have any questions, please contact our HR department.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} ${data.companyName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${data.portalUrl}
+    </p>
   `
-}
 
-// --- Email Functions ---
+  return getBaseLayout({
+    title: 'Application Invitation',
+    heading: 'Application Invitation',
+    greeting: `Hi, <strong>${data.firstName} ${data.lastName}</strong>!`,
+    bodyHtml,
+  })
+}
 
 function getWelcomeEmailTemplate(data: WelcomeEmailData & { companyName: string, frontendUrl: string }): string {
   const credentialsSection = data.password ? `
-              <!-- Login Credentials Card -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #fef3c7; border-radius: 8px; border: 1px solid #fbbf24;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 12px 0; color: #92400e; font-size: 14px; font-weight: 600;">
-                      Your Login Credentials
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
-                      <strong>Email:</strong> ${data.email}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #1f2937; font-size: 14px;">
-                      <strong>Password:</strong> <code style="background-color: #ffffff; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">${data.password}</code>
-                    </p>
-                    <p style="margin: 12px 0 0 0; color: #92400e; font-size: 12px;">
-                      Please change your password after your first login for security purposes.
-                    </p>
-                  </td>
-                </tr>
-              </table>
+    <!-- Login Credentials -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #FFF8E1; border-radius: 8px; border: 1px solid #FFE082;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 10px 0; color: #E65100; font-size: 13px; font-weight: 700;">Your Login Credentials</p>
+          <p style="margin: 0 0 6px 0; color: #333333; font-size: 14px;"><strong>Email:</strong> ${data.email}</p>
+          <p style="margin: 0 0 6px 0; color: #333333; font-size: 14px;"><strong>Password:</strong> <code style="background-color: #ffffff; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">${data.password}</code></p>
+          <p style="margin: 10px 0 0 0; color: #E65100; font-size: 11px;">Please change your password after your first login for security purposes.</p>
+        </td>
+      </tr>
+    </table>
   ` : ''
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to ${data.companyName}</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #6366f1; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                ${data.companyName}
-              </h1>
-              <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 14px;">
-                HRIS Portal
-              </p>
-            </td>
-          </tr>
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Your HRIS account has been created successfully. You can now access the system to manage your employee information.
+    </p>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
-                Welcome ${data.displayName}!
-              </h2>
+    ${credentialsSection}
 
-              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Your HRIS account has been created successfully. You can now access the system to manage your employee information.
-              </p>
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.frontendUrl}/login" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            Login to HRIS
+          </a>
+        </td>
+      </tr>
+    </table>
 
-              ${credentialsSection}
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${data.frontendUrl}/login"
-                       style="display: inline-block; padding: 14px 32px; background-color: #6366f1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
-                      Login to HRIS
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                If the button above doesn't work, you can copy and paste the following link into your browser:
-              </p>
-              <p style="margin: 8px 0 20px 0; word-break: break-all; color: #6366f1; font-size: 14px;">
-                ${data.frontendUrl}/login
-              </p>
-
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-              <p style="margin: 0; color: #9ca3af; font-size: 14px;">
-                If you have any questions, please contact the HR department.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} ${data.companyName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${data.frontendUrl}/login
+    </p>
   `
+
+  return getBaseLayout({
+    title: `Welcome to ${data.companyName}`,
+    heading: 'Welcome to TUV Nord Central',
+    greeting: `Hi, <strong>${data.displayName}</strong>!`,
+    bodyHtml,
+  })
 }
 
-export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
-  const config = getEmailConfig()
-  const mg = getMailgunClient()
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+function getPasswordResetTemplate(params: { email: string, resetUrl: string, companyName: string }): string {
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      We received a request to reset the password for your account. Click the button below to set a new password.
+    </p>
 
-  const html = getWelcomeEmailTemplate({
-    ...data,
-    companyName: config.companyName,
-    frontendUrl,
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${params.resetUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            Reset Password
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${params.resetUrl}
+    </p>
+
+    <p style="margin: 20px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      This link will expire in 1 hour. If you did not request a password reset, please ignore this email.
+    </p>
+  `
+
+  return getBaseLayout({
+    title: 'Password Reset Request',
+    heading: 'Password Reset',
+    greeting: `Hi, <strong>${params.email}</strong>!`,
+    bodyHtml,
   })
-
-  await mg.messages.create(config.domain, {
-    from: `${config.companyName} <${config.from}>`,
-    to: data.email,
-    subject: `Welcome to ${config.companyName} - Your HRIS Account`,
-    html,
-  })
-
-  console.log(`[MAILGUN] Welcome email sent to ${data.email}`)
-}
-
-export async function sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
-  const config = getEmailConfig()
-  const mg = getMailgunClient()
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
-  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`
-
-  await mg.messages.create(config.domain, {
-    from: `${config.companyName} <${config.from}>`,
-    to: email,
-    subject: 'Password Reset Request',
-    html: `
-      <h1>Password Reset</h1>
-      <p>Click the link below to reset your password:</p>
-      <a href="${resetUrl}">${resetUrl}</a>
-      <p>This link will expire in 1 hour.</p>
-    `,
-  })
-
-  console.log(`[MAILGUN] Password reset email sent to ${email}`)
-}
-
-export async function sendCandidateInvitationEmail(data: CandidateInvitationEmailData): Promise<void> {
-  const config = getEmailConfig()
-  const mg = getMailgunClient()
-
-  const html = getCandidateInvitationTemplate({
-    ...data,
-    companyName: config.companyName,
-  })
-
-  await mg.messages.create(config.domain, {
-    from: `${config.companyName} Recruitment <${config.from}>`,
-    to: data.email,
-    subject: `Application Invitation - ${data.jobTitle} at ${config.companyName}`,
-    html,
-  })
-
-  console.log(`[MAILGUN] Candidate invitation email sent to ${data.email}`)
 }
 
 function getInterviewAssignmentTemplate(data: InterviewAssignmentEmailData & { companyName: string }): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interview Assignment</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #3b82f6; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                ${data.companyName}
-              </h1>
-              <p style="margin: 10px 0 0 0; color: #dbeafe; font-size: 14px;">
-                Interview Assignment Notification
-              </p>
-            </td>
-          </tr>
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      You have been assigned to conduct an interview for a candidate. Please review the details below and prepare accordingly.
+    </p>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
-                Hello ${data.assessorName},
-              </h2>
+    <!-- Assignment Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Interview Type</p>
+          <p style="margin: 0 0 14px 0; color: #0032A0; font-size: 17px; font-weight: 700;">${data.interviewType}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Candidate Name</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.candidateName}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Applied Position</p>
+          <p style="margin: 0; color: #1a1a1a; font-size: 15px;">${data.jobTitle}</p>
+        </td>
+      </tr>
+    </table>
 
-              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                You have been assigned to conduct an interview for a candidate. Please review the details below and prepare accordingly.
-              </p>
+    <p style="margin: 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Please access the recruitment dashboard to review the candidate's profile and biodata before the interview.
+    </p>
 
-              <!-- Assignment Card -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Interview Type
-                    </p>
-                    <p style="margin: 0 0 16px 0; color: #1e40af; font-size: 18px; font-weight: 600;">
-                      ${data.interviewType}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Candidate Name
-                    </p>
-                    <p style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; font-weight: 500;">
-                      ${data.candidateName}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Applied Position
-                    </p>
-                    <p style="margin: 0; color: #1f2937; font-size: 16px;">
-                      ${data.jobTitle}
-                    </p>
-                  </td>
-                </tr>
-              </table>
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.dashboardUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            View Candidate Details
+          </a>
+        </td>
+      </tr>
+    </table>
 
-              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Please access the recruitment dashboard to review the candidate's profile and biodata before the interview.
-              </p>
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${data.dashboardUrl}"
-                       style="display: inline-block; padding: 14px 32px; background-color: #3b82f6; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
-                      View Candidate Details
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                If the button above doesn't work, you can copy and paste the following link into your browser:
-              </p>
-              <p style="margin: 8px 0 20px 0; word-break: break-all; color: #3b82f6; font-size: 14px;">
-                ${data.dashboardUrl}
-              </p>
-
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-              <p style="margin: 0; color: #9ca3af; font-size: 14px;">
-                If you have any questions, please contact the HR department.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} ${data.companyName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${data.dashboardUrl}
+    </p>
   `
-}
 
-export async function sendInterviewAssignmentEmail(data: InterviewAssignmentEmailData): Promise<void> {
-  const config = getEmailConfig()
-  const mg = getMailgunClient()
-
-  const html = getInterviewAssignmentTemplate({
-    ...data,
-    companyName: config.companyName,
+  return getBaseLayout({
+    title: 'Interview Assignment',
+    heading: 'Interview Assignment',
+    greeting: `Hi, <strong>${data.assessorName}</strong>!`,
+    bodyHtml,
   })
-
-  await mg.messages.create(config.domain, {
-    from: `${config.companyName} HR <${config.from}>`,
-    to: data.assessorEmail,
-    subject: `Interview Assignment: ${data.candidateName} - ${data.jobTitle}`,
-    html,
-  })
-
-  console.log(`[MAILGUN] Interview assignment email sent to ${data.assessorEmail}`)
 }
 
 // --- Onboarding Email ---
@@ -489,125 +389,48 @@ export interface OnboardingEmailData {
 }
 
 function getOnboardingEmailTemplate(data: OnboardingEmailData & { companyName: string }): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Onboarding Details</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #10b981; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                🎉 Congratulations!
-              </h1>
-              <p style="margin: 10px 0 0 0; color: #d1fae5; font-size: 14px;">
-                Welcome to ${data.companyName}
-              </p>
-            </td>
-          </tr>
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      We are pleased to inform you that you have successfully passed all assessment stages.
+      Below are your onboarding details. Please review and confirm your acceptance.
+    </p>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
-                Dear ${data.candidateName},
-              </h2>
+    <!-- Details Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Position</p>
+          <p style="margin: 0 0 14px 0; color: #0032A0; font-size: 17px; font-weight: 700;">${data.jobTitle}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Work Location</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.workLocation}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Join Date</p>
+          <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.joinDate}</p>
+        </td>
+      </tr>
+    </table>
 
-              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                We are pleased to inform you that you have successfully passed all assessment stages.
-                Below are your onboarding details. Please review and confirm your acceptance.
-              </p>
+    <p style="margin: 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Please click the button below to view your complete onboarding details and confirm your acceptance of the offer.
+    </p>
 
-              <!-- Details Card -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Position
-                    </p>
-                    <p style="margin: 0 0 16px 0; color: #047857; font-size: 18px; font-weight: 600;">
-                      ${data.jobTitle}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Work Location
-                    </p>
-                    <p style="margin: 0 0 16px 0; color: #1f2937; font-size: 16px; font-weight: 500;">
-                      ${data.workLocation}
-                    </p>
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Join Date
-                    </p>
-                    <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">
-                      ${data.joinDate}
-                    </p>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Please click the button below to view your complete onboarding details and confirm your acceptance of the offer.
-              </p>
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${data.portalUrl}"
-                       style="display: inline-block; padding: 14px 32px; background-color: #10b981; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);">
-                      View Onboarding Details
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                If you have any questions, please contact our HR team.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                ${data.companyName} - Human Resources
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.portalUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            View Onboarding Details
+          </a>
+        </td>
+      </tr>
+    </table>
   `
-}
 
-export async function sendOnboardingEmail(data: OnboardingEmailData): Promise<void> {
-  const config = getEmailConfig()
-  const mg = getMailgunClient()
-
-  const html = getOnboardingEmailTemplate({
-    ...data,
-    companyName: config.companyName,
+  return getBaseLayout({
+    title: 'Onboarding Details',
+    heading: 'Congratulations!',
+    greeting: `Hi, <strong>${data.candidateName}</strong>!`,
+    bodyHtml,
   })
-
-  await mg.messages.create(config.domain, {
-    from: `${config.companyName} HR <${config.from}>`,
-    to: data.candidateEmail,
-    subject: `Welcome to ${config.companyName} - Please Confirm Your Onboarding`,
-    html,
-  })
-
-  console.log(`[MAILGUN] Onboarding email sent to ${data.candidateEmail}`)
 }
 
 // --- Interview Schedule Email (to Candidate) ---
@@ -633,119 +456,201 @@ function getInterviewScheduleTemplate(data: InterviewScheduleEmailData & { compa
   })
 
   const typeLabel = data.interviewType === 'online' ? 'Online (Virtual)' : 'Onsite (Tatap Muka)'
-  const typeColor = data.interviewType === 'online' ? '#3b82f6' : '#059669'
-  const typeIcon = data.interviewType === 'online' ? '💻' : '🏢'
 
-  return `
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jadwal Interview</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #6366f1; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                ${data.companyName}
-              </h1>
-              <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 14px;">
-                Interview Invitation
-              </p>
-            </td>
-          </tr>
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      We are pleased to inform you that your application has been reviewed and you have been scheduled for an interview. Please find the details below:
+    </p>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600;">
-                Dear ${data.candidateName},
-              </h2>
+    <!-- Interview Details Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Position</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.jobTitle}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Interview Date & Time</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${formattedDate} WIB</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Interview Type</p>
+          <p style="margin: 0; color: #0032A0; font-size: 15px; font-weight: 600;">${typeLabel}</p>
+        </td>
+      </tr>
+    </table>
 
-              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                We are pleased to inform you that your application has been reviewed and you have been scheduled for an interview. Please find the details below:
-              </p>
+    <p style="margin: 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Please make sure you are available at the scheduled time. You can check your interview status and details through our Candidate Portal.
+    </p>
 
-              <!-- Interview Details Card -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid ${typeColor};">
-                <tr>
-                  <td style="padding: 24px;">
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Position
-                    </p>
-                    <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
-                      ${data.jobTitle}
-                    </p>
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.portalUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            Open Candidate Portal
+          </a>
+        </td>
+      </tr>
+    </table>
 
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Interview Date & Time
-                    </p>
-                    <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 16px; font-weight: 500;">
-                      📅 ${formattedDate} WIB
-                    </p>
-
-                    <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Interview Type
-                    </p>
-                    <p style="margin: 0; color: ${typeColor}; font-size: 16px; font-weight: 600;">
-                      ${typeIcon} ${typeLabel}
-                    </p>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Please make sure you are available at the scheduled time. You can check your interview status and details through our Candidate Portal.
-              </p>
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${data.portalUrl}"
-                       style="display: inline-block; padding: 14px 32px; background-color: #6366f1; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
-                      Open Candidate Portal
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                If the button above doesn't work, you can copy and paste the following link into your browser:
-              </p>
-              <p style="margin: 8px 0 20px 0; word-break: break-all; color: #6366f1; font-size: 14px;">
-                ${data.portalUrl}
-              </p>
-
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-
-              <p style="margin: 0; color: #9ca3af; font-size: 14px;">
-                If you have any questions or need to reschedule, please contact our HR department.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} ${data.companyName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${data.portalUrl}
+    </p>
   `
+
+  return getBaseLayout({
+    title: 'Interview Invitation',
+    heading: 'Interview Invitation',
+    greeting: `Hi, <strong>${data.candidateName}</strong>!`,
+    bodyHtml,
+  })
+}
+
+// --- Candidate Rejection Email ---
+
+export type CandidateRejectionEmailData = {
+  candidateEmail: string
+  candidateName: string
+  jobTitle: string
+  stage: 'HR Assessment' | 'User Assessment' | 'Medical Check-Up'
+}
+
+function getCandidateRejectionTemplate(data: CandidateRejectionEmailData & { companyName: string }): string {
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Thank you for your interest in the <strong>${data.jobTitle}</strong> position at ${data.companyName} and for taking the time to go through our recruitment process.
+    </p>
+
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      After careful consideration, we regret to inform you that we will not be moving forward with your application at this time.
+    </p>
+
+    <!-- Info Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #999999;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Position</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.jobTitle}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Stage</p>
+          <p style="margin: 0; color: #1a1a1a; font-size: 15px;">${data.stage}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 16px 0 0 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      We encourage you to apply for future openings that match your skills and experience. We wish you all the best in your career endeavors.
+    </p>
+  `
+
+  return getBaseLayout({
+    title: 'Application Update',
+    heading: 'Recruitment Update',
+    greeting: `Hi, <strong>${data.candidateName}</strong>!`,
+    bodyHtml,
+  })
+}
+
+// --- Email Functions ---
+
+export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+
+  const html = getWelcomeEmailTemplate({
+    ...data,
+    companyName: config.companyName,
+    frontendUrl,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.email,
+    subject: `Welcome to ${config.companyName} - Your HRIS Account`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Welcome email sent to ${data.email}`)
+}
+
+export async function sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`
+
+  const html = getPasswordResetTemplate({
+    email,
+    resetUrl,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: email,
+    subject: 'Password Reset Request',
+    html,
+  })
+
+  console.log(`[MAILGUN] Password reset email sent to ${email}`)
+}
+
+export async function sendCandidateInvitationEmail(data: CandidateInvitationEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getCandidateInvitationTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.email,
+    subject: `Application Invitation - ${data.jobTitle}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Candidate invitation email sent to ${data.email}`)
+}
+
+export async function sendInterviewAssignmentEmail(data: InterviewAssignmentEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getInterviewAssignmentTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.assessorEmail,
+    subject: `Interview Assignment: ${data.candidateName} - ${data.jobTitle}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Interview assignment email sent to ${data.assessorEmail}`)
+}
+
+export async function sendOnboardingEmail(data: OnboardingEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getOnboardingEmailTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.candidateEmail,
+    subject: `Welcome to ${config.companyName} - Please Confirm Your Onboarding`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Onboarding email sent to ${data.candidateEmail}`)
 }
 
 export async function sendInterviewScheduleEmail(data: InterviewScheduleEmailData): Promise<void> {
@@ -758,13 +663,32 @@ export async function sendInterviewScheduleEmail(data: InterviewScheduleEmailDat
   })
 
   await mg.messages.create(config.domain, {
-    from: `${config.companyName} HR <${config.from}>`,
+    from: `${config.fromName} <${config.from}>`,
     to: data.candidateEmail,
-    subject: `Interview Invitation - ${data.jobTitle} at ${config.companyName}`,
+    subject: `Interview Invitation - ${data.jobTitle}`,
     html,
   })
 
   console.log(`[MAILGUN] Interview schedule email sent to ${data.candidateEmail}`)
+}
+
+export async function sendCandidateRejectionEmail(data: CandidateRejectionEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getCandidateRejectionTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.candidateEmail,
+    subject: `Application Update - ${data.jobTitle}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Candidate rejection email sent to ${data.candidateEmail}`)
 }
 
 // --- Utility Functions ---
@@ -774,7 +698,6 @@ export async function verifyEmailConfiguration(): Promise<boolean> {
     const config = getEmailConfig()
     const mg = getMailgunClient()
 
-    // Try to get domain info to verify credentials
     await mg.domains.get(config.domain)
     console.log('[MAILGUN] Configuration verified successfully')
     return true

@@ -8,7 +8,7 @@ import type { CandidateLoginBody, CandidateProfileUpdate } from '../schemas/cand
 import { UnauthorizedError } from '../errors/index.js'
 
 // Transform candidate data for API response (snake_case)
-function transformCandidate(candidate: CandidateRecruitment & { candidateCode?: string }) {
+function transformCandidate(candidate: CandidateRecruitment & { candidateCode?: string | undefined; jobTitleName?: string | undefined; isSubmitted?: boolean | undefined }) {
   return {
     id: Number(candidate.id),
     fullname: candidate.fullname,
@@ -35,7 +35,9 @@ function transformCandidate(candidate: CandidateRecruitment & { candidateCode?: 
     agreement_version: candidate.agreementVersion || null,
     created_at: candidate.createdAt?.toISOString() || null,
     updated_at: candidate.updatedAt?.toISOString() || null,
-    candidate_code: candidate.candidateCode || null
+    candidate_code: candidate.candidateCode || null,
+    job_title_name: candidate.jobTitleName || null,
+    is_submitted: candidate.isSubmitted || false
   }
 }
 
@@ -75,14 +77,6 @@ export async function getProfile(
 
   const candidate = await candidateAuthService.getProfile(request.candidate.candidateId)
   const transformed = transformCandidate(candidate)
-
-  // Debug: Log transformed response
-  console.log('[DEBUG] getProfile - transformed response:', {
-    uniform_shirt_size: transformed.uniform_shirt_size,
-    uniform_pants_size: transformed.uniform_pants_size,
-    domicile_address: transformed.domicile_address,
-    driving_license: transformed.driving_license,
-  })
 
   return reply.status(200).send(
     successResponse(transformed)

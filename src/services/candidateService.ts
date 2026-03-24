@@ -2,7 +2,7 @@ import type { CandidateRecruitment } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
-import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate } from './emailService.js'
+import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail } from './emailService.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
@@ -147,6 +147,42 @@ async function sendAssessorNotifications(params: AssessorNotificationParams): Pr
       console.error(`[EMAIL] Failed to send email to assessor ${assessorId}:`, error)
       // Continue with other assessors even if one fails
     }
+  }
+}
+
+// ==================== Rejection Notification Helper ====================
+
+type RejectionStage = 'HR Assessment' | 'User Assessment' | 'Medical Check-Up'
+
+async function sendRejectionNotification(candidateId: number, stage: RejectionStage): Promise<void> {
+  try {
+    const candidateResult = await candidateRepository.findById(candidateId)
+    if (candidateResult.isFailure()) {
+      console.error(`[EMAIL] Failed to fetch candidate ${candidateId} for rejection email:`, candidateResult.error)
+      return
+    }
+
+    const candidate = candidateResult.getValue()
+    if (!candidate) {
+      console.error(`[EMAIL] Candidate ${candidateId} not found for rejection email`)
+      return
+    }
+
+    if (!candidate.email) {
+      console.error(`[EMAIL] Candidate ${candidateId} has no email for rejection notification`)
+      return
+    }
+
+    await sendCandidateRejectionEmail({
+      candidateEmail: candidate.email,
+      candidateName: candidate.fullname,
+      jobTitle: candidate.jobTitle?.name || 'Position',
+      stage,
+    })
+
+    console.log(`[EMAIL] Rejection email sent to ${candidate.email} at stage: ${stage}`)
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send rejection email for candidate ${candidateId}:`, error)
   }
 }
 
@@ -647,6 +683,11 @@ export async function updateInterview1(
     }
   }
 
+  // Send rejection email if candidate failed
+  if (status === 'FAILED') {
+    sendRejectionNotification(candidateId, 'HR Assessment')
+  }
+
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
   if (progressResult.isFailure()) {
     throw new Error(progressResult.error)
@@ -708,6 +749,11 @@ export async function updateInterview2(
     }
   }
 
+  // Send rejection email if candidate failed
+  if (status === 'FAILED') {
+    sendRejectionNotification(candidateId, 'User Assessment')
+  }
+
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
   if (progressResult.isFailure()) {
     throw new Error(progressResult.error)
@@ -749,6 +795,11 @@ export async function updateMcu(
 
   if (updateResult.isFailure()) {
     throw new Error(updateResult.error)
+  }
+
+  // Send rejection email if candidate failed
+  if (status === 'FAILED') {
+    sendRejectionNotification(candidateId, 'Medical Check-Up')
   }
 
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)

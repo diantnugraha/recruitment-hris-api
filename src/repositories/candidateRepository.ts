@@ -343,7 +343,7 @@ export async function create(data: CreateCandidateData): Promise<RepositoryResul
         address: data.address || '',
         resident_status: data.residentStatus || '',
         birth_place: data.birthPlace || '',
-        birth_date: data.birthDate || new Date(),
+        birth_date: data.birthDate || null,
         religion: data.religion || '',
         ethnic_group: data.ethnicGroup || '',
         id_no: data.idNo || '',

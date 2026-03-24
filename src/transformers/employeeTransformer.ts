@@ -52,6 +52,7 @@ export type TransformedEmployee = {
   // Additional
   employee_religion: string | null
   employee_ethnic: string | null
+  employee_nationality: string | null
   // Relations
   department: {
     id: string
@@ -184,7 +185,7 @@ export function transformEmployee(
     employee_contact: employee.employeeContact ?? null,
     date_of_birth: formatDate(employee.employeeBirthdate),
     gender: employee.employeeGender ?? null,
-    address: null,
+    address: employee.employeeAddress ?? null,
     hire_date: formattedHireDate,
     status,
     department_id: resolvedDept ? resolvedDept.id.toString() : null,
@@ -225,6 +226,7 @@ export function transformEmployee(
     // Additional
     employee_religion: employee.employeeReligion ?? null,
     employee_ethnic: employee.employeeEthnic ?? null,
+    employee_nationality: employee.employeeNationality ?? null,
 
     // Department resolved from job_title → department_job_title → departments
     department: resolvedDept

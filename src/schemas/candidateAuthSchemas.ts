@@ -55,7 +55,9 @@ export const CandidateResponseSchema = Type.Object({
   agreement_version: Type.Union([Type.String(), Type.Null()]),
   created_at: Type.Union([Type.String(), Type.Null()]),
   updated_at: Type.Union([Type.String(), Type.Null()]),
-  candidate_code: Type.Union([Type.String(), Type.Null()])
+  candidate_code: Type.Union([Type.String(), Type.Null()]),
+  job_title_name: Type.Union([Type.String(), Type.Null()]),
+  is_submitted: Type.Boolean()
 })
 
 export type CandidateResponse = Static<typeof CandidateResponseSchema>

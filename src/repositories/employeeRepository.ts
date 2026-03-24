@@ -44,6 +44,7 @@ export type CreateEmployeeData = {
   address?: string
   religion?: string
   ethnic?: string
+  nationality?: string
   motherName?: string
   fatherName?: string
   spouseName?: string
@@ -73,6 +74,7 @@ export type UpdateEmployeeData = {
   address?: string
   religion?: string
   ethnic?: string
+  nationality?: string
   motherName?: string
   fatherName?: string
   spouseName?: string
@@ -176,6 +178,7 @@ export async function create(data: CreateEmployeeData): Promise<RepositoryResult
     if (data.address !== undefined) createData.employeeAddress = data.address
     if (data.religion !== undefined) createData.employeeReligion = data.religion
     if (data.ethnic !== undefined) createData.employeeEthnic = data.ethnic
+    if (data.nationality !== undefined) createData.employeeNationality = data.nationality
     if (data.motherName !== undefined) createData.employeeMother = data.motherName
     if (data.fatherName !== undefined) createData.employeeFather = data.fatherName
     if (data.spouseName !== undefined) createData.employeeSpouse = data.spouseName
@@ -215,6 +218,7 @@ export async function update(id: number, data: UpdateEmployeeData): Promise<Repo
     if (data.address !== undefined) updateData.employeeAddress = data.address
     if (data.religion !== undefined) updateData.employeeReligion = data.religion
     if (data.ethnic !== undefined) updateData.employeeEthnic = data.ethnic
+    if (data.nationality !== undefined) updateData.employeeNationality = data.nationality
     if (data.motherName !== undefined) updateData.employeeMother = data.motherName
     if (data.fatherName !== undefined) updateData.employeeFather = data.fatherName
     if (data.spouseName !== undefined) updateData.employeeSpouse = data.spouseName
