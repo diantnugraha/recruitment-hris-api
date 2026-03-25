@@ -672,6 +672,97 @@ export async function sendInterviewScheduleEmail(data: InterviewScheduleEmailDat
   console.log(`[MAILGUN] Interview schedule email sent to ${data.candidateEmail}`)
 }
 
+// --- MCU Schedule Email (to Candidate) ---
+
+export type McuScheduleEmailData = {
+  candidateEmail: string
+  candidateName: string
+  jobTitle: string
+  mcuDate: string
+  mcuLocation: string
+  portalUrl: string
+}
+
+function getMcuScheduleTemplate(data: McuScheduleEmailData & { companyName: string }): string {
+  const formattedDate = new Date(data.mcuDate).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  })
+
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Congratulations on passing the interview stage! You have been scheduled for a Medical Check-Up (MCU). Please find the details below:
+    </p>
+
+    <!-- MCU Details Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Position</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.jobTitle}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">MCU Date & Time</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${formattedDate} WIB</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Location</p>
+          <p style="margin: 0; color: #0032A0; font-size: 15px; font-weight: 600;">${data.mcuLocation}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Please make sure you are available at the scheduled time and location. You can check your MCU status and details through our Candidate Portal.
+    </p>
+
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.portalUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            Open Candidate Portal
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${data.portalUrl}
+    </p>
+  `
+
+  return getBaseLayout({
+    title: 'Medical Check-Up Schedule',
+    heading: 'Medical Check-Up Schedule',
+    greeting: `Hi, <strong>${data.candidateName}</strong>!`,
+    bodyHtml,
+  })
+}
+
+export async function sendMcuScheduleEmail(data: McuScheduleEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getMcuScheduleTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.candidateEmail,
+    subject: `Medical Check-Up Schedule - ${data.jobTitle}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] MCU schedule email sent to ${data.candidateEmail}`)
+}
+
 export async function sendCandidateRejectionEmail(data: CandidateRejectionEmailData): Promise<void> {
   const config = getEmailConfig()
   const mg = getMailgunClient()

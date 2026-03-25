@@ -252,6 +252,39 @@ export async function getMcuDocument(
   }
 }
 
+// Schedule MCU - sets mcu_date and mcu_location
+export async function scheduleMcu(
+  candidateId: number,
+  mcuDate: Date,
+  mcuLocation: string
+): Promise<RepositoryResult<candidate_recruitment_assessment>> {
+  try {
+    const assessment = await prisma.candidate_recruitment_assessment.findFirst({
+      where: { candidate_id: candidateId }
+    })
+
+    if (!assessment) {
+      return failure('Assessment not found for this candidate')
+    }
+
+    const updateData: Record<string, unknown> = {
+      mcu_date: mcuDate,
+      mcu_location: mcuLocation,
+      updated_at: new Date()
+    }
+
+    const updated = await prisma.candidate_recruitment_assessment.update({
+      where: { id: assessment.id },
+      data: updateData as Parameters<typeof prisma.candidate_recruitment_assessment.update>[0]['data']
+    })
+
+    return success(updated)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to schedule MCU'
+    return failure(message)
+  }
+}
+
 // Start interview - sets interview_started_at, interview_date, and interview_type
 export async function startInterview(
   candidateId: number,
@@ -371,6 +404,8 @@ export type AssessmentProgress = {
   interviewStartedAt: string | null
   interviewDate: string | null
   interviewType: string | null
+  mcuDate: string | null
+  mcuLocation: string | null
 }
 
 // ==================== Scoring CRUD ====================
@@ -577,7 +612,9 @@ export async function getProgress(candidateId: number): Promise<RepositoryResult
       interviewStarted,
       interviewStartedAt: assessment.interview_started_at?.toISOString() || null,
       interviewDate: record.interview_date ? (record.interview_date as Date).toISOString() : null,
-      interviewType: (record.interview_type as string) ?? null
+      interviewType: (record.interview_type as string) ?? null,
+      mcuDate: record.mcu_date ? (record.mcu_date as Date).toISOString() : null,
+      mcuLocation: (record.mcu_location as string) ?? null
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get assessment progress'

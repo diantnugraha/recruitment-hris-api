@@ -2,7 +2,7 @@ import type { CandidateRecruitment } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
-import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail } from './emailService.js'
+import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendMcuScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail } from './emailService.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
@@ -752,6 +752,67 @@ export async function updateInterview2(
   // Send rejection email if candidate failed
   if (status === 'FAILED') {
     sendRejectionNotification(candidateId, 'User Assessment')
+  }
+
+  const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
+  if (progressResult.isFailure()) {
+    throw new Error(progressResult.error)
+  }
+
+  return progressResult.getValue()!
+}
+
+export async function scheduleMcu(
+  candidateId: number,
+  mcuDate: string,
+  mcuLocation: string
+): Promise<AssessmentProgress> {
+  const candidateResult = await candidateRepository.findById(candidateId)
+  if (candidateResult.isFailure()) {
+    throw new Error(candidateResult.error)
+  }
+
+  const candidate = candidateResult.getValue()
+  if (!candidate) {
+    throw new NotFoundError('Candidate not found')
+  }
+
+  const assessmentResult = await candidateAssessmentRepository.findByCandidateId(candidateId)
+  if (assessmentResult.isFailure()) {
+    throw new Error(assessmentResult.error)
+  }
+
+  const assessment = assessmentResult.getValue()
+  if (!assessment) {
+    throw new NotFoundError('Assessment not found for this candidate')
+  }
+
+  // Check if Interview 2 is passed (MCU should be locked otherwise)
+  if (assessment.interview2_status !== 'PASSED') {
+    throw new BadRequestError('Cannot schedule MCU before Interview 2 is passed')
+  }
+
+  const parsedDate = new Date(mcuDate)
+  const scheduleResult = await candidateAssessmentRepository.scheduleMcu(candidateId, parsedDate, mcuLocation)
+  if (scheduleResult.isFailure()) {
+    throw new Error(scheduleResult.error)
+  }
+
+  // Send MCU schedule email to candidate
+  const jobTitle = candidate.jobTitle?.name || 'Position'
+  const portalUrl = `${process.env.CANDIDATE_PORTAL_URL || 'http://localhost:3001'}/profile`
+
+  try {
+    await sendMcuScheduleEmail({
+      candidateEmail: candidate.email,
+      candidateName: candidate.fullname,
+      jobTitle,
+      mcuDate,
+      mcuLocation,
+      portalUrl,
+    })
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send MCU schedule email to ${candidate.email}:`, error)
   }
 
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)

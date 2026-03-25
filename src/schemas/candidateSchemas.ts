@@ -149,3 +149,11 @@ export const StartAssessmentBodySchema = Type.Object({
 })
 
 export type StartAssessmentBody = Static<typeof StartAssessmentBodySchema>
+
+// Schedule MCU schema
+export const ScheduleMcuBodySchema = Type.Object({
+  mcu_date: Type.String({ format: 'date-time' }),
+  mcu_location: Type.String({ minLength: 1 })
+})
+
+export type ScheduleMcuBody = Static<typeof ScheduleMcuBodySchema>

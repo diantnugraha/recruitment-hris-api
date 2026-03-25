@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
-import type { StartAssessmentBody } from '../schemas/candidateSchemas.js'
+import type { StartAssessmentBody, ScheduleMcuBody } from '../schemas/candidateSchemas.js'
 import * as candidateService from '../services/candidateService.js'
 import * as candidateProfileRepository from '../repositories/candidateProfileRepository.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
@@ -401,6 +401,18 @@ export async function updateInterview2(
   const progress = await candidateService.updateInterview2(id, status as AssessmentStatus, description, scoringPayload)
 
   sendSuccess(reply, progress, 'Interview User updated successfully')
+}
+
+export async function scheduleMcu(
+  request: FastifyRequest<{ Params: IdParam; Body: ScheduleMcuBody }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { id } = request.params
+  const { mcu_date, mcu_location } = request.body
+
+  const progress = await candidateService.scheduleMcu(id, mcu_date, mcu_location)
+
+  sendSuccess(reply, progress, 'MCU scheduled successfully')
 }
 
 type McuUpdateBody = AssessmentUpdateBody & {

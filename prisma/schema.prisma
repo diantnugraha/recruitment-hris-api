@@ -435,6 +435,8 @@ model candidate_recruitment_assessment {
   interview_type                  InterviewType?   @map("interview_type")
   mcu_document_url                String?          @map("mcu_document_url") @db.VarChar(500)
   mcu_document_name               String?          @map("mcu_document_name") @db.VarChar(255)
+  mcu_date                        DateTime?        @map("mcu_date") @db.Timestamp(0)
+  mcu_location                    String?          @map("mcu_location") @db.VarChar(255)
 
   scoring   candidate_assessment_scoring[]
   assignees candidate_assessment_assignee[]

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import * as candidateController from '../controllers/candidateController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
-import { StartAssessmentBodySchema, type StartAssessmentBody } from '../schemas/candidateSchemas.js'
+import { StartAssessmentBodySchema, type StartAssessmentBody, ScheduleMcuBodySchema, type ScheduleMcuBody } from '../schemas/candidateSchemas.js'
 
 // Body types for routes
 type UpdateCandidateBody = {
@@ -185,6 +185,13 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     '/:id/assessment/assignees',
     { schema: { params: IdParamSchema } },
     candidateController.getAssessmentAssignees
+  )
+
+  // Schedule MCU
+  app.post<{ Params: IdParam; Body: ScheduleMcuBody }>(
+    '/:id/assessment/mcu/schedule',
+    { schema: { params: IdParamSchema, body: ScheduleMcuBodySchema } },
+    candidateController.scheduleMcu
   )
 
   // Update MCU
