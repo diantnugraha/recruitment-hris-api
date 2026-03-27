@@ -782,6 +782,102 @@ export async function sendCandidateRejectionEmail(data: CandidateRejectionEmailD
   console.log(`[MAILGUN] Candidate rejection email sent to ${data.candidateEmail}`)
 }
 
+// --- SLA Email Types ---
+
+export interface SlaApproachingEmailData {
+  recipientEmail: string;
+  recipientName: string;
+  requestCode: string;
+  jobTitle: string;
+  remainingDays: number;
+  dueDate: string;
+}
+
+export interface SlaOverdueEmailData {
+  recipientEmail: string;
+  recipientName: string;
+  requestCode: string;
+  jobTitle: string;
+  overdueDays: number;
+  dueDate: string;
+}
+
+// --- SLA Email Templates ---
+
+function getSlaApproachingTemplate(data: SlaApproachingEmailData & { companyName: string }): string {
+  const bodyHtml = `
+    <p>${data.requestCode} for <strong>${data.jobTitle}</strong> has <strong>${data.remainingDays} working days</strong> remaining before the SLA deadline.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 20px 0;">
+      <tr>
+        <td style="padding: 15px; background-color: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+          <p style="margin: 0; font-weight: 600; color: #92400e;">SLA Deadline: ${data.dueDate}</p>
+          <p style="margin: 5px 0 0; color: #92400e;">${data.remainingDays} working days remaining</p>
+        </td>
+      </tr>
+    </table>
+    <p>Please ensure the recruitment process is progressing to meet the deadline.</p>
+  `;
+
+  return getBaseLayout({
+    title: `SLA Approaching - ${data.requestCode}`,
+    heading: 'Recruitment SLA Approaching',
+    greeting: `Dear ${data.recipientName},`,
+    bodyHtml,
+  });
+}
+
+export async function sendSlaApproachingEmail(data: SlaApproachingEmailData): Promise<void> {
+  const config = getEmailConfig();
+  const mg = getMailgunClient();
+  const html = getSlaApproachingTemplate({ ...data, companyName: config.companyName });
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.recipientEmail,
+    subject: `Recruitment SLA Approaching - ${data.requestCode}`,
+    html,
+  });
+
+  console.log(`[MAILGUN] SLA approaching email sent to ${data.recipientEmail}`)
+}
+
+function getSlaOverdueTemplate(data: SlaOverdueEmailData & { companyName: string }): string {
+  const bodyHtml = `
+    <p>${data.requestCode} for <strong>${data.jobTitle}</strong> has exceeded the 45 working-day SLA by <strong>${data.overdueDays} days</strong>.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 20px 0;">
+      <tr>
+        <td style="padding: 15px; background-color: #fee2e2; border-radius: 8px; border-left: 4px solid #ef4444;">
+          <p style="margin: 0; font-weight: 600; color: #991b1b;">SLA Deadline: ${data.dueDate} (exceeded)</p>
+          <p style="margin: 5px 0 0; color: #991b1b;">Overdue by ${data.overdueDays} working days</p>
+        </td>
+      </tr>
+    </table>
+    <p>The recruitment process can still proceed. Please take action to complete the process as soon as possible.</p>
+  `;
+
+  return getBaseLayout({
+    title: `SLA Overdue - ${data.requestCode}`,
+    heading: 'Recruitment SLA Overdue',
+    greeting: `Dear ${data.recipientName},`,
+    bodyHtml,
+  });
+}
+
+export async function sendSlaOverdueEmail(data: SlaOverdueEmailData): Promise<void> {
+  const config = getEmailConfig();
+  const mg = getMailgunClient();
+  const html = getSlaOverdueTemplate({ ...data, companyName: config.companyName });
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.recipientEmail,
+    subject: `Recruitment SLA Overdue - ${data.requestCode}`,
+    html,
+  });
+
+  console.log(`[MAILGUN] SLA overdue email sent to ${data.recipientEmail}`)
+}
+
 // --- Utility Functions ---
 
 export async function verifyEmailConfiguration(): Promise<boolean> {
