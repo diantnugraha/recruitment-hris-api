@@ -6,7 +6,7 @@ import * as notificationService from '../services/notificationService.js';
 import { sendSlaApproachingEmail, sendSlaOverdueEmail } from '../services/emailService.js';
 import { format } from 'date-fns';
 
-async function getHrUsers(): Promise<Array<{ id: number; email: string; name: string }>> {
+async function getHrUsers(): Promise<Array<{ id: number; email: string; name: string | null }>> {
   const users = await prisma.user.findMany({
     where: {
       role: {
@@ -77,7 +77,7 @@ async function checkSlaDeadlines(): Promise<void> {
 
             await sendSlaApproachingEmail({
               recipientEmail: user.email,
-              recipientName: user.name,
+              recipientName: user.name || 'HR Team',
               requestCode,
               jobTitle,
               remainingDays,
@@ -109,7 +109,7 @@ async function checkSlaDeadlines(): Promise<void> {
 
             await sendSlaOverdueEmail({
               recipientEmail: user.email,
-              recipientName: user.name,
+              recipientName: user.name || 'HR Team',
               requestCode,
               jobTitle,
               overdueDays,
