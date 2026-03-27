@@ -29,6 +29,7 @@ model User {
 
   employeeRequests        EmployeeRequest[]
   employeeRequestComments EmployeeRequestComment[]
+  notifications           Notification[]
 
   hodReviewedRequests      EmployeeRequest[] @relation("HodReviewer")
   hrReviewedRequests       EmployeeRequest[] @relation("HrReviewer")
@@ -306,6 +307,7 @@ model EmployeeRequest {
   revisedAt             DateTime?             @map("revised_at") @db.Timestamp(0)
   rejectedBy            Int?                  @map("rejected_by")
   rejectedAt            DateTime?             @map("rejected_at") @db.Timestamp(0)
+  recruitmentStartedAt  DateTime?             @map("recruitment_started_at") @db.Timestamp(0)
 
   createdByUser User                     @relation(fields: [createdBy], references: [id])
   comments      EmployeeRequestComment[]
@@ -333,6 +335,26 @@ model EmployeeRequestComment {
   @@index([employeeRequestId])
   @@index([userId])
   @@map("employee_request_comment")
+}
+
+model Notification {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  userId        Int       @map("user_id")
+  type          String    @db.VarChar(30)
+  title         String    @db.VarChar(255)
+  message       String    @db.Text
+  referenceType String?   @map("reference_type") @db.VarChar(50)
+  referenceId   BigInt?   @map("reference_id") @db.UnsignedBigInt
+  isRead        Boolean   @default(false) @map("is_read")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @map("updated_at") @db.Timestamp(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([referenceType, referenceId, type])
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notification")
 }
 
 enum CandidateVerify {
