@@ -15,6 +15,7 @@ import { candidateAuthRoutes } from './candidateAuthRoutes.js'
 import { candidateProfileRoutes } from './candidateProfileRoutes.js'
 import { employeeRequestRoutes } from './employeeRequestRoutes.js'
 import { roleRoutes } from './roleRoutes.js'
+import { notificationRoutes } from './notificationRoutes.js'
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes, { prefix: '/health' })
@@ -32,4 +33,5 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(candidateProfileRoutes, { prefix: '/v1/candidate-profile' })
   await app.register(employeeRequestRoutes, { prefix: '/v1/employee-request' })
   await app.register(roleRoutes, { prefix: '/v1/role' })
+  await app.register(notificationRoutes, { prefix: '/v1/notifications' })
 }
