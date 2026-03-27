@@ -316,6 +316,7 @@ export async function updateEmployeeRequestStatus(
   // Generate recruitment code when starting recruitment
   if (targetStatus === EMPLOYEE_REQUEST_STATUS.IN_RECRUITMENT) {
     updateData.codeRecruitment = await employeeRequestRepository.generateRecruitmentCode()
+    updateData.recruitmentStartedAt = new Date()
   }
 
   const result = await employeeRequestRepository.update(id, updateData)

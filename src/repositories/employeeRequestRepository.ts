@@ -116,6 +116,7 @@ export type UpdateEmployeeRequestData = {
   revisedAt?: Date | null
   rejectedBy?: number | null
   rejectedAt?: Date | null
+  recruitmentStartedAt?: Date | null
 }
 
 export interface RoleFilter {
@@ -398,6 +399,9 @@ export async function update(id: number, data: UpdateEmployeeRequestData): Promi
     if (data.revisedAt !== undefined) updateData.revisedAt = data.revisedAt
     if (data.rejectedBy !== undefined) updateData.rejectedBy = data.rejectedBy
     if (data.rejectedAt !== undefined) updateData.rejectedAt = data.rejectedAt
+    if (data.recruitmentStartedAt !== undefined) {
+      updateData.recruitmentStartedAt = data.recruitmentStartedAt
+    }
     updateData.updatedAt = new Date()
 
     const employeeRequest = await prisma.employeeRequest.update({

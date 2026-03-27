@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 
 import type { IdParam } from '../schemas/common.js'
+import { getSlaInfo } from '../services/slaService.js'
 import type {
   EmployeeRequestQuery,
   CreateEmployeeRequestBody,
@@ -56,6 +57,10 @@ function transformEmployeeRequest(request: EmployeeRequestWithRelations) {
     revised_at: request.revisedAt?.toISOString() || null,
     rejected_by: request.rejectedBy,
     rejected_at: request.rejectedAt?.toISOString() || null,
+    recruitment_started_at: request.recruitmentStartedAt?.toISOString() || null,
+    sla: (request.statusEmployeeRequest === 6 || request.statusEmployeeRequest === 7)
+      ? getSlaInfo(request.recruitmentStartedAt || null)
+      : null,
     department_id: request.departmentId,
     created_at: request.createdAt?.toISOString() || null,
     updated_at: request.updatedAt?.toISOString() || null,
