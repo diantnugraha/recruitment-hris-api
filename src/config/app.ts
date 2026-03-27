@@ -5,6 +5,7 @@ import multipart from '@fastify/multipart'
 
 import { errorHandler } from '../middlewares/errorHandler.js'
 import { registerRoutes } from '../routes/index.js'
+import { startSlaCronJob } from '../cron/slaCronJob.js'
 
 // BigInt serialization support for JSON
 declare global {
@@ -48,6 +49,9 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Routes
   await registerRoutes(app)
+
+  // Cron jobs
+  startSlaCronJob()
 
   return app
 }
