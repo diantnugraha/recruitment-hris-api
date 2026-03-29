@@ -1425,6 +1425,26 @@ export async function acceptOnboarding(candidateId: number): Promise<OnboardingW
     // Don't throw - onboarding acceptance is more important
   }
 
+  // Send in-app notification to HR who invited the candidate
+  try {
+    const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+    if (invitedBy) {
+      const candidate = await candidateRepository.findById(candidateId)
+      const candidateName = candidate.isSuccess()
+        ? candidate.getValue()?.fullname || 'Unknown'
+        : 'Unknown'
+
+      await sendRecruitmentNotification({
+        type: RECRUITMENT_NOTIFICATION_TYPE.ONBOARDING_ACCEPTED,
+        candidateId,
+        candidateName,
+        targetUserIds: [invitedBy],
+      })
+    }
+  } catch (err) {
+    console.error('[NOTIFICATION] Failed to send onboarding accepted notification:', err)
+  }
+
   // Fetch with relations
   const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
   if (onboardingResult.isFailure()) {
