@@ -12,11 +12,6 @@ import * as employeeRequestRepository from '../repositories/employeeRequestRepos
 import { prisma } from '../config/database.js'
 import { sendRecruitmentNotification } from './recruitmentNotificationHelper.js'
 import { RECRUITMENT_NOTIFICATION_TYPE } from '../constants/recruitmentNotificationConstants.js'
-
-// Generate random 8-character password (alphanumeric)
-function generateRandomPassword(): string {
-  return randomBytes(4).toString('hex').toUpperCase()
-}
 import type {
   CandidateFilters,
   PaginationParams,
@@ -24,6 +19,11 @@ import type {
 } from '../repositories/candidateRepository.js'
 import type { AssessmentStatus, AssessmentProgress } from '../repositories/candidateAssessmentRepository.js'
 import type { OnboardingWithRelations } from '../repositories/onboardingRepository.js'
+
+// Generate random 8-character password (alphanumeric)
+function generateRandomPassword(): string {
+  return randomBytes(4).toString('hex').toUpperCase()
+}
 
 // ==================== Type Definitions ====================
 
@@ -792,25 +792,27 @@ export async function updateInterview2(
     sendRejectionNotification(candidateId, 'User Assessment')
   }
 
-  // Send in-app notification to HR who invited the candidate
-  try {
-    const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
-    if (invitedBy) {
-      const candidate = await candidateRepository.findById(candidateId)
-      const candidateName = candidate.isSuccess()
-        ? candidate.getValue()?.fullname || 'Unknown'
-        : 'Unknown'
+  // Send in-app notification to HR who invited the candidate (only for final results)
+  if (status === 'PASSED' || status === 'FAILED') {
+    try {
+      const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+      if (invitedBy) {
+        const candidate = await candidateRepository.findById(candidateId)
+        const candidateName = candidate.isSuccess()
+          ? candidate.getValue()?.fullname || 'Unknown'
+          : 'Unknown'
 
-      await sendRecruitmentNotification({
-        type: RECRUITMENT_NOTIFICATION_TYPE.INTERVIEW_USER_COMPLETED,
-        candidateId,
-        candidateName,
-        targetUserIds: [invitedBy],
-        extra: status === 'PASSED' ? 'Passed' : 'Failed',
-      })
+        await sendRecruitmentNotification({
+          type: RECRUITMENT_NOTIFICATION_TYPE.INTERVIEW_USER_COMPLETED,
+          candidateId,
+          candidateName,
+          targetUserIds: [invitedBy],
+          extra: status === 'PASSED' ? 'Passed' : 'Failed',
+        })
+      }
+    } catch (err) {
+      console.error('[NOTIFICATION] Failed to send interview user completed notification:', err)
     }
-  } catch (err) {
-    console.error('[NOTIFICATION] Failed to send interview user completed notification:', err)
   }
 
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
