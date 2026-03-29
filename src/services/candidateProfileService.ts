@@ -11,6 +11,9 @@ import * as candidateDetailRepository from '../repositories/candidateDetailRepos
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
 import { BadRequestError, NotFoundError } from '../errors/index.js'
+import * as candidateRepository from '../repositories/candidateRepository.js'
+import { sendRecruitmentNotification } from './recruitmentNotificationHelper.js'
+import { RECRUITMENT_NOTIFICATION_TYPE } from '../constants/recruitmentNotificationConstants.js'
 
 // ==================== EDUCATIONAL BACKGROUND ====================
 
@@ -263,6 +266,26 @@ export async function submitBiodata(candidateId: number): Promise<void> {
 
   if (result.isFailure()) {
     throw new BadRequestError(result.getError() || 'Failed to submit biodata')
+  }
+
+  // Send notification to HR who invited the candidate
+  try {
+    const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+    if (invitedBy) {
+      const candidateResult = await candidateRepository.findById(candidateId)
+      const candidateName = candidateResult.isSuccess()
+        ? candidateResult.getValue()?.fullname || 'Unknown'
+        : 'Unknown'
+
+      await sendRecruitmentNotification({
+        type: RECRUITMENT_NOTIFICATION_TYPE.BIODATA_SUBMITTED,
+        candidateId,
+        candidateName,
+        targetUserIds: [invitedBy],
+      })
+    }
+  } catch (err) {
+    console.error('[NOTIFICATION] Failed to send biodata submitted notification:', err)
   }
 }
 
