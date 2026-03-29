@@ -437,7 +437,8 @@ export async function verifyCandidate(id: number): Promise<void> {
 
 export async function sendCandidateInvitation(
   candidateId: number,
-  portalBaseUrl: string
+  portalBaseUrl: string,
+  userId: number
 ): Promise<{ success: boolean; message: string }> {
   // Get candidate with relations
   const candidate = await getCandidateById(candidateId)
@@ -479,6 +480,12 @@ export async function sendCandidateInvitation(
     portalUrl,
     password: plainPassword,
   })
+
+  // Save which HR user sent the invitation
+  const invitedByResult = await candidateDetailRepository.updateInvitedBy(candidateId, userId)
+  if (invitedByResult.isFailure()) {
+    console.error(`[NOTIFICATION] Failed to save invited_by for candidate ${candidateId}:`, invitedByResult.error)
+  }
 
   return {
     success: true,

@@ -301,7 +301,7 @@ export async function sendInvitation(
   const { id } = request.params
   const { portal_base_url } = request.body
 
-  const result = await candidateService.sendCandidateInvitation(id, portal_base_url)
+  const result = await candidateService.sendCandidateInvitation(id, portal_base_url, request.user.userId)
 
   sendSuccess(reply, result, 'Invitation email sent successfully')
 }
