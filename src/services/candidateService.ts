@@ -9,6 +9,9 @@ import * as candidateAssessmentRepository from '../repositories/candidateAssessm
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
 import * as employeeRepository from '../repositories/employeeRepository.js'
 import * as employeeRequestRepository from '../repositories/employeeRequestRepository.js'
+import { prisma } from '../config/database.js'
+import { sendRecruitmentNotification } from './recruitmentNotificationHelper.js'
+import { RECRUITMENT_NOTIFICATION_TYPE } from '../constants/recruitmentNotificationConstants.js'
 
 // Generate random 8-character password (alphanumeric)
 function generateRandomPassword(): string {
@@ -687,6 +690,34 @@ export async function updateInterview1(
         assessorIds: scoringPayload.assessorIds,
         interviewType: 'Interview User',
       })
+
+      // Send in-app notification to assigned assessors
+      try {
+        const candidate = await candidateRepository.findById(candidateId)
+        const candidateName = candidate.isSuccess()
+          ? candidate.getValue()?.fullname || 'Unknown'
+          : 'Unknown'
+
+        const userIds: number[] = []
+        for (const employeeId of scoringPayload.assessorIds) {
+          const user = await prisma.user.findFirst({
+            where: { employeeId, trash: null },
+            select: { id: true },
+          })
+          if (user) userIds.push(user.id)
+        }
+
+        if (userIds.length > 0) {
+          await sendRecruitmentNotification({
+            type: RECRUITMENT_NOTIFICATION_TYPE.ASSESSOR_ASSIGNED,
+            candidateId,
+            candidateName,
+            targetUserIds: userIds,
+          })
+        }
+      } catch (err) {
+        console.error('[NOTIFICATION] Failed to send assessor assigned notification:', err)
+      }
     }
   }
 
