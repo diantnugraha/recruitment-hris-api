@@ -792,6 +792,27 @@ export async function updateInterview2(
     sendRejectionNotification(candidateId, 'User Assessment')
   }
 
+  // Send in-app notification to HR who invited the candidate
+  try {
+    const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+    if (invitedBy) {
+      const candidate = await candidateRepository.findById(candidateId)
+      const candidateName = candidate.isSuccess()
+        ? candidate.getValue()?.fullname || 'Unknown'
+        : 'Unknown'
+
+      await sendRecruitmentNotification({
+        type: RECRUITMENT_NOTIFICATION_TYPE.INTERVIEW_USER_COMPLETED,
+        candidateId,
+        candidateName,
+        targetUserIds: [invitedBy],
+        extra: status === 'PASSED' ? 'Passed' : 'Failed',
+      })
+    }
+  } catch (err) {
+    console.error('[NOTIFICATION] Failed to send interview user completed notification:', err)
+  }
+
   const progressResult = await candidateAssessmentRepository.getProgress(candidateId)
   if (progressResult.isFailure()) {
     throw new Error(progressResult.error)
