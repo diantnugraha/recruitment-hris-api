@@ -198,6 +198,31 @@ export async function setPassword(candidateId: number, password: string): Promis
   }
 }
 
+export async function updateInvitedBy(candidateId: number, userId: number): Promise<RepositoryResult<boolean>> {
+  try {
+    await prisma.candidate_recruitment_detail.updateMany({
+      where: { candidate_id: candidateId },
+      data: { invited_by: userId, updatedAt: new Date() },
+    })
+    return success(true)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update invited_by'
+    return failure(message)
+  }
+}
+
+export async function getInvitedBy(candidateId: number): Promise<number | null> {
+  try {
+    const detail = await prisma.candidate_recruitment_detail.findFirst({
+      where: { candidate_id: candidateId },
+      select: { invited_by: true },
+    })
+    return detail?.invited_by ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function findByEmailWithDetail(email: string): Promise<RepositoryResult<{
   candidate: { id: bigint; email: string; fullname: string; verify: string } | null
   detail: candidate_recruitment_detail | null
