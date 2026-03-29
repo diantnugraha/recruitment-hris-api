@@ -340,7 +340,7 @@ model EmployeeRequestComment {
 model Notification {
   id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   userId        Int       @map("user_id")
-  type          String    @db.VarChar(30)
+  type          String    @db.VarChar(50)
   title         String    @db.VarChar(255)
   message       String    @db.Text
   referenceType String?   @map("reference_type") @db.VarChar(50)
@@ -351,7 +351,7 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id])
 
-  @@unique([referenceType, referenceId, type])
+  @@unique([referenceType, referenceId, type, userId])
   @@index([userId])
   @@index([userId, isRead])
   @@map("notification")
@@ -415,6 +415,7 @@ model candidate_recruitment_detail {
   candidate_token     String                @db.Text
   candidate_verify    CandidateDetailVerify
   employee_request_id String                @db.Text
+  invited_by          Int?                  @map("invited_by")
 
   @@map("candidate_recruitment_detail")
 }
