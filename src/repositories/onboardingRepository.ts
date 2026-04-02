@@ -1,12 +1,25 @@
-import type { candidate_recruitment_onboarding, facillities, OnboardingProgram, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { candidate_recruitment_onboarding, facillities, OnboardingProgram, facility_pics, program_pics } from '@prisma/client'
 
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
 
+// Types for PIC relations
+export type FacilityPicSelect = Pick<facility_pics, 'id' | 'employee_id'>
+export type ProgramPicSelect = Pick<program_pics, 'id' | 'employee_id'>
+
+export type FacilityWithPics = facillities & {
+  pics: FacilityPicSelect[]
+}
+
+export type ProgramWithPics = OnboardingProgram & {
+  pics: ProgramPicSelect[]
+}
+
 // Types for onboarding with relations
 export type OnboardingWithRelations = candidate_recruitment_onboarding & {
-  facilities?: facillities[]
-  programs?: OnboardingProgram[]
+  facilities?: FacilityWithPics[]
+  programs?: ProgramWithPics[]
 }
 
 // ========== Onboarding Main Record ==========
@@ -36,14 +49,24 @@ export async function findOnboardingById(id: number): Promise<RepositoryResult<O
       return success(null)
     }
 
-    // Fetch facilities
+    // Fetch facilities with pics
     const facilities = await prisma.facillities.findMany({
-      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) }
+      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
 
-    // Fetch programs
+    // Fetch programs with pics
     const programs = await prisma.onboardingProgram.findMany({
-      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) }
+      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
 
     return success({
@@ -67,14 +90,24 @@ export async function findOnboardingByCandidateId(candidateId: number): Promise<
       return success(null)
     }
 
-    // Fetch facilities
+    // Fetch facilities with pics
     const facilities = await prisma.facillities.findMany({
-      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) }
+      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
 
-    // Fetch programs
+    // Fetch programs with pics
     const programs = await prisma.onboardingProgram.findMany({
-      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) }
+      where: { candidate_recruitment_onboarding_id: Number(onboarding.id) },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
 
     return success({
@@ -158,28 +191,50 @@ export async function removeOnboarding(id: number): Promise<RepositoryResult<boo
 
 export type CreateFacilityData = {
   onboardingId: number
-  inventoryNo: string
   item: string
   qty: number
   unit: string
   condition: string
   status: string
+  pic_employee_ids: number[]
 }
 
 export type UpdateFacilityData = {
-  inventoryNo?: string
   item?: string
   qty?: number
   unit?: string
   condition?: string
   status?: string
+  pic_employee_ids?: number[]
 }
 
-export async function findFacilitiesByOnboardingId(onboardingId: number): Promise<RepositoryResult<facillities[]>> {
+export async function generateInventoryNo(): Promise<string> {
+  const prefix = 'INV-TNI-'
+  const lastFacility = await prisma.facillities.findFirst({
+    where: { inventory_no: { startsWith: prefix } },
+    orderBy: { inventory_no: 'desc' },
+    select: { inventory_no: true },
+  })
+
+  let nextNumber = 1
+  if (lastFacility?.inventory_no) {
+    const currentNum = parseInt(lastFacility.inventory_no.replace(prefix, ''), 10)
+    if (!isNaN(currentNum)) nextNumber = currentNum + 1
+  }
+
+  return `${prefix}${nextNumber.toString().padStart(3, '0')}`
+}
+
+export async function findFacilitiesByOnboardingId(onboardingId: number): Promise<RepositoryResult<FacilityWithPics[]>> {
   try {
     const facilities = await prisma.facillities.findMany({
       where: { candidate_recruitment_onboarding_id: onboardingId },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
     return success(facilities)
   } catch (error) {
@@ -188,10 +243,15 @@ export async function findFacilitiesByOnboardingId(onboardingId: number): Promis
   }
 }
 
-export async function findFacilityById(id: number): Promise<RepositoryResult<facillities | null>> {
+export async function findFacilityById(id: number): Promise<RepositoryResult<FacilityWithPics | null>> {
   try {
     const facility = await prisma.facillities.findUnique({
-      where: { id: BigInt(id) }
+      where: { id: BigInt(id) },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
     return success(facility)
   } catch (error) {
@@ -200,44 +260,106 @@ export async function findFacilityById(id: number): Promise<RepositoryResult<fac
   }
 }
 
-export async function createFacility(data: CreateFacilityData): Promise<RepositoryResult<facillities>> {
-  try {
-    const facility = await prisma.facillities.create({
-      data: {
-        candidate_recruitment_onboarding_id: data.onboardingId,
-        inventory_no: data.inventoryNo,
-        item: data.item,
-        qty: data.qty,
-        unit: data.unit,
-        condition: data.condition,
-        status: data.status
-      }
-    })
+export async function createFacility(data: CreateFacilityData): Promise<RepositoryResult<FacilityWithPics>> {
+  const MAX_RETRIES = 3
 
-    return success(facility)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create facility'
-    return failure(message)
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const inventoryNo = await generateInventoryNo()
+
+      const facility = await prisma.$transaction(async (tx) => {
+        const created = await tx.facillities.create({
+          data: {
+            candidate_recruitment_onboarding_id: data.onboardingId,
+            inventory_no: inventoryNo,
+            item: data.item,
+            qty: data.qty,
+            unit: data.unit,
+            condition: data.condition,
+            status: data.status
+          }
+        })
+
+        if (data.pic_employee_ids.length > 0) {
+          await tx.facility_pics.createMany({
+            data: data.pic_employee_ids.map((employeeId) => ({
+              facility_id: created.id,
+              employee_id: employeeId
+            }))
+          })
+        }
+
+        return tx.facillities.findUniqueOrThrow({
+          where: { id: created.id },
+          include: {
+            pics: {
+              select: { id: true, employee_id: true }
+            }
+          }
+        })
+      })
+
+      return success(facility)
+    } catch (err: unknown) {
+      // Retry on unique constraint violation (inventory_no collision)
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002' &&
+        attempt < MAX_RETRIES - 1
+      ) {
+        continue
+      }
+      const message = err instanceof Error ? err.message : 'Failed to create facility'
+      return failure(message)
+    }
   }
+
+  return failure('Failed to create facility after maximum retries')
 }
 
 export async function updateFacility(
   id: number,
   data: UpdateFacilityData
-): Promise<RepositoryResult<facillities>> {
+): Promise<RepositoryResult<FacilityWithPics>> {
   try {
-    const updateData: Prisma.facillitiesUpdateInput = {}
+    const facility = await prisma.$transaction(async (tx) => {
+      const updateData: Prisma.facillitiesUpdateInput = {}
 
-    if (data.inventoryNo !== undefined) updateData.inventory_no = data.inventoryNo
-    if (data.item !== undefined) updateData.item = data.item
-    if (data.qty !== undefined) updateData.qty = data.qty
-    if (data.unit !== undefined) updateData.unit = data.unit
-    if (data.condition !== undefined) updateData.condition = data.condition
-    if (data.status !== undefined) updateData.status = data.status
+      if (data.item !== undefined) updateData.item = data.item
+      if (data.qty !== undefined) updateData.qty = data.qty
+      if (data.unit !== undefined) updateData.unit = data.unit
+      if (data.condition !== undefined) updateData.condition = data.condition
+      if (data.status !== undefined) updateData.status = data.status
 
-    const facility = await prisma.facillities.update({
-      where: { id: BigInt(id) },
-      data: updateData
+      await tx.facillities.update({
+        where: { id: BigInt(id) },
+        data: updateData
+      })
+
+      // Replace pics if provided
+      if (data.pic_employee_ids !== undefined) {
+        await tx.facility_pics.deleteMany({
+          where: { facility_id: BigInt(id) }
+        })
+
+        if (data.pic_employee_ids.length > 0) {
+          await tx.facility_pics.createMany({
+            data: data.pic_employee_ids.map((employeeId) => ({
+              facility_id: BigInt(id),
+              employee_id: employeeId
+            }))
+          })
+        }
+      }
+
+      return tx.facillities.findUniqueOrThrow({
+        where: { id: BigInt(id) },
+        include: {
+          pics: {
+            select: { id: true, employee_id: true }
+          }
+        }
+      })
     })
 
     return success(facility)
@@ -266,23 +388,28 @@ export type CreateProgramData = {
   program: string
   date: string
   location: string
-  pic: string
-  status: string
+  status?: string
+  pic_employee_ids: number[]
 }
 
 export type UpdateProgramData = {
   program?: string
   date?: string
   location?: string
-  pic?: string
   status?: string
+  pic_employee_ids?: number[]
 }
 
-export async function findProgramsByOnboardingId(onboardingId: number): Promise<RepositoryResult<OnboardingProgram[]>> {
+export async function findProgramsByOnboardingId(onboardingId: number): Promise<RepositoryResult<ProgramWithPics[]>> {
   try {
     const programs = await prisma.onboardingProgram.findMany({
       where: { candidate_recruitment_onboarding_id: onboardingId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
     return success(programs)
   } catch (error) {
@@ -291,10 +418,15 @@ export async function findProgramsByOnboardingId(onboardingId: number): Promise<
   }
 }
 
-export async function findProgramById(id: number): Promise<RepositoryResult<OnboardingProgram | null>> {
+export async function findProgramById(id: number): Promise<RepositoryResult<ProgramWithPics | null>> {
   try {
     const program = await prisma.onboardingProgram.findUnique({
-      where: { id: BigInt(id) }
+      where: { id: BigInt(id) },
+      include: {
+        pics: {
+          select: { id: true, employee_id: true }
+        }
+      }
     })
     return success(program)
   } catch (error) {
@@ -303,17 +435,37 @@ export async function findProgramById(id: number): Promise<RepositoryResult<Onbo
   }
 }
 
-export async function createProgram(data: CreateProgramData): Promise<RepositoryResult<OnboardingProgram>> {
+export async function createProgram(data: CreateProgramData): Promise<RepositoryResult<ProgramWithPics>> {
   try {
-    const program = await prisma.onboardingProgram.create({
-      data: {
-        candidate_recruitment_onboarding_id: data.onboardingId,
-        program: data.program,
-        date: data.date,
-        location: data.location,
-        pic: data.pic,
-        status: data.status
+    const program = await prisma.$transaction(async (tx) => {
+      const created = await tx.onboardingProgram.create({
+        data: {
+          candidate_recruitment_onboarding_id: data.onboardingId,
+          program: data.program,
+          date: data.date,
+          location: data.location,
+          pic_legacy: '',
+          status: data.status || 'Scheduled'
+        }
+      })
+
+      if (data.pic_employee_ids.length > 0) {
+        await tx.program_pics.createMany({
+          data: data.pic_employee_ids.map((employeeId) => ({
+            program_id: created.id,
+            employee_id: employeeId
+          }))
+        })
       }
+
+      return tx.onboardingProgram.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          pics: {
+            select: { id: true, employee_id: true }
+          }
+        }
+      })
     })
 
     return success(program)
@@ -326,19 +478,45 @@ export async function createProgram(data: CreateProgramData): Promise<Repository
 export async function updateProgram(
   id: number,
   data: UpdateProgramData
-): Promise<RepositoryResult<OnboardingProgram>> {
+): Promise<RepositoryResult<ProgramWithPics>> {
   try {
-    const updateData: Prisma.OnboardingProgramUpdateInput = {}
+    const program = await prisma.$transaction(async (tx) => {
+      const updateData: Prisma.OnboardingProgramUpdateInput = {}
 
-    if (data.program !== undefined) updateData.program = data.program
-    if (data.date !== undefined) updateData.date = data.date
-    if (data.location !== undefined) updateData.location = data.location
-    if (data.pic !== undefined) updateData.pic = data.pic
-    if (data.status !== undefined) updateData.status = data.status
+      if (data.program !== undefined) updateData.program = data.program
+      if (data.date !== undefined) updateData.date = data.date
+      if (data.location !== undefined) updateData.location = data.location
+      if (data.status !== undefined) updateData.status = data.status
 
-    const program = await prisma.onboardingProgram.update({
-      where: { id: BigInt(id) },
-      data: updateData
+      await tx.onboardingProgram.update({
+        where: { id: BigInt(id) },
+        data: updateData
+      })
+
+      // Replace pics if provided
+      if (data.pic_employee_ids !== undefined) {
+        await tx.program_pics.deleteMany({
+          where: { program_id: BigInt(id) }
+        })
+
+        if (data.pic_employee_ids.length > 0) {
+          await tx.program_pics.createMany({
+            data: data.pic_employee_ids.map((employeeId) => ({
+              program_id: BigInt(id),
+              employee_id: employeeId
+            }))
+          })
+        }
+      }
+
+      return tx.onboardingProgram.findUniqueOrThrow({
+        where: { id: BigInt(id) },
+        include: {
+          pics: {
+            select: { id: true, employee_id: true }
+          }
+        }
+      })
     })
 
     return success(program)
