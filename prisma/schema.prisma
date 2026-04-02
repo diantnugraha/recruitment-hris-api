@@ -548,6 +548,7 @@ model candidate_recruitment_onboarding {
   updatedAt                       DateTime? @map("updated_at") @db.Timestamp(0)
   document_candidate              String    @db.Text
   onboardingAcceptedAt            DateTime? @map("onboarding_accepted_at") @db.Timestamp(0)
+  join_date                       String?   @db.VarChar(20)
 
   @@map("candidate_recruitment_onboarding")
 }
@@ -564,8 +565,37 @@ model facillities {
   updated_at                          DateTime? @db.Timestamp(0)
   candidate_recruitment_onboarding_id Int
 
+  pics                                facility_pics[]
+
+  @@unique([inventory_no])
   @@index([candidate_recruitment_onboarding_id])
   @@map("facillities")
+}
+
+model facility_pics {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  facility_id BigInt   @db.UnsignedBigInt
+  employee_id Int
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+
+  facility    facillities @relation(fields: [facility_id], references: [id], onDelete: Cascade)
+
+  @@index([facility_id])
+  @@index([employee_id])
+  @@map("facility_pics")
+}
+
+model program_pics {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  program_id BigInt   @db.UnsignedBigInt
+  employee_id Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  program    OnboardingProgram @relation(fields: [program_id], references: [id], onDelete: Cascade)
+
+  @@index([program_id])
+  @@index([employee_id])
+  @@map("program_pics")
 }
 
 model OnboardingProgram {
@@ -574,10 +604,12 @@ model OnboardingProgram {
   program                             String    @db.VarChar(255)
   date                                String    @db.VarChar(50)
   location                            String    @db.VarChar(255)
-  pic                                 String    @db.VarChar(255)
+  pic_legacy                          String    @map("pic") @db.VarChar(255)
   status                              String    @db.VarChar(50)
   createdAt                           DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt                           DateTime? @map("updated_at") @db.Timestamp(0)
+
+  pics                                program_pics[]
 
   @@index([candidate_recruitment_onboarding_id])
   @@map("onboarding_program")
