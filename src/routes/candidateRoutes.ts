@@ -60,23 +60,30 @@ type OnboardingBody = {
   job_placement?: string
   document?: string
   document_candidate?: string
+  join_date?: string
 }
 
 type FacilityBody = {
-  inventory_no: string
   item: string
   qty: number
   unit: string
   condition: string
   status: string
+  pic_employee_ids: number[]
 }
 
 type ProgramBody = {
   program: string
   date: string
   location: string
-  pic: string
+  pic_employee_ids: number[]
   status: string
+}
+
+type SendOnboardingBody = {
+  portal_base_url: string
+  join_date?: string
+  work_location?: string
 }
 
 type SendInvitationBody = {
@@ -246,7 +253,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   )
 
   // Send onboarding email to candidate
-  app.post<{ Params: IdParam; Body: { portal_base_url: string } }>(
+  app.post<{ Params: IdParam; Body: SendOnboardingBody }>(
     '/:id/onboarding/send',
     { schema: { params: IdParamSchema } },
     candidateController.sendOnboarding

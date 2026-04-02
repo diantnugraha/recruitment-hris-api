@@ -145,15 +145,23 @@ export async function acceptOnboarding(
         qty: f.qty,
         unit: f.unit,
         condition: f.condition,
-        status: f.status
+        status: f.status,
+        pics: (f.pics || []).map(pic => ({
+          id: Number(pic.id),
+          employee_id: pic.employee_id
+        }))
       })) || [],
       programs: onboarding.programs?.map(p => ({
         id: Number(p.id),
         program: p.program,
         date: p.date,
         location: p.location,
-        pic: p.pic,
-        status: p.status
+        pic_legacy: p.pic_legacy,
+        status: p.status,
+        pics: (p.pics || []).map(pic => ({
+          id: Number(pic.id),
+          employee_id: pic.employee_id
+        }))
       })) || []
     })
   )

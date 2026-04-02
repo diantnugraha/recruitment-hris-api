@@ -403,6 +403,7 @@ export async function getOnboarding(
       job_placement: onboarding.job_placement,
       document: onboarding.document,
       document_candidate: onboarding.document_candidate,
+      join_date: onboarding.join_date || null,
       facilities: (onboarding.facilities || []).map(f => ({
         id: Number(f.id),
         inventory_no: f.inventory_no,
@@ -410,15 +411,23 @@ export async function getOnboarding(
         qty: f.qty,
         unit: f.unit,
         condition: f.condition,
-        status: f.status
+        status: f.status,
+        pics: (f.pics || []).map(pic => ({
+          id: Number(pic.id),
+          employee_id: pic.employee_id
+        }))
       })),
       programs: (onboarding.programs || []).map(p => ({
         id: Number(p.id),
         program: p.program,
         date: p.date,
         location: p.location,
-        pic: p.pic,
-        status: p.status
+        pic_legacy: p.pic_legacy,
+        status: p.status,
+        pics: (p.pics || []).map(pic => ({
+          id: Number(pic.id),
+          employee_id: pic.employee_id
+        }))
       })),
       onboarding_accepted_at: onboarding.onboardingAcceptedAt?.toISOString() || null,
       created_at: onboarding.createdAt?.toISOString() || null,

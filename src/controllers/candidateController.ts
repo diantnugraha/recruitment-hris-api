@@ -4,6 +4,7 @@ import type { IdParam } from '../schemas/common.js'
 import type { StartAssessmentBody, ScheduleMcuBody } from '../schemas/candidateSchemas.js'
 import * as candidateService from '../services/candidateService.js'
 import * as candidateProfileRepository from '../repositories/candidateProfileRepository.js'
+import * as employeeRepository from '../repositories/employeeRepository.js'
 import { sendSuccess, sendPaginated, calculatePagination } from '../utils/response.js'
 import type { CandidateWithDetail } from '../repositories/candidateRepository.js'
 import type { AssessmentStatus } from '../repositories/candidateAssessmentRepository.js'
@@ -73,22 +74,23 @@ type OnboardingBody = {
   job_placement?: string
   document?: string
   document_candidate?: string
+  join_date?: string
 }
 
 type FacilityBody = {
-  inventory_no: string
   item: string
   qty: number
   unit: string
   condition: string
   status: string
+  pic_employee_ids: number[]
 }
 
 type ProgramBody = {
   program: string
   date: string
   location: string
-  pic: string
+  pic_employee_ids: number[]
   status: string
 }
 
@@ -148,6 +150,22 @@ function transformCandidate(candidate: CandidateWithDetail) {
     } : null,
     onboarding_accepted_at: candidate.onboarding?.onboardingAcceptedAt?.toISOString() || null
   }
+}
+
+// Helper to enrich PIC employee IDs with name and email
+async function enrichPics(pics: Array<{ id: bigint; employee_id: number }>): Promise<Array<{ id: number; employee_id: number; name: string; email: string }>> {
+  const enriched: Array<{ id: number; employee_id: number; name: string; email: string }> = []
+  for (const pic of pics) {
+    const empResult = await employeeRepository.findById(pic.employee_id)
+    const emp = empResult.isSuccess() ? empResult.getValue() : null
+    enriched.push({
+      id: Number(pic.id),
+      employee_id: pic.employee_id,
+      name: emp?.employeeName || `Employee ${pic.employee_id}`,
+      email: emp?.employeeEmail || ''
+    })
+  }
+  return enriched
 }
 
 // ==================== CRUD Endpoints ====================
@@ -561,6 +579,32 @@ export async function getOnboarding(
     return
   }
 
+  // Enrich facility and program PICs with employee info
+  const facilities = await Promise.all(
+    (onboarding.facilities || []).map(async (f) => ({
+      id: Number(f.id),
+      inventory_no: f.inventory_no,
+      item: f.item,
+      qty: f.qty,
+      unit: f.unit,
+      condition: f.condition,
+      status: f.status,
+      pics: await enrichPics(f.pics || [])
+    }))
+  )
+
+  const programs = await Promise.all(
+    (onboarding.programs || []).map(async (p) => ({
+      id: Number(p.id),
+      program: p.program,
+      date: p.date,
+      location: p.location,
+      pic_legacy: p.pic_legacy,
+      status: p.status,
+      pics: await enrichPics(p.pics || [])
+    }))
+  )
+
   sendSuccess(reply, {
     id: Number(onboarding.id),
     candidate_id: onboarding.candidate_id,
@@ -568,24 +612,10 @@ export async function getOnboarding(
     job_placement: onboarding.job_placement,
     document: onboarding.document,
     document_candidate: onboarding.document_candidate,
+    join_date: onboarding.join_date || null,
     onboarding_accepted_at: onboarding.onboardingAcceptedAt?.toISOString() || null,
-    facilities: onboarding.facilities?.map(f => ({
-      id: Number(f.id),
-      inventory_no: f.inventory_no,
-      item: f.item,
-      qty: f.qty,
-      unit: f.unit,
-      condition: f.condition,
-      status: f.status
-    })) || [],
-    programs: onboarding.programs?.map(p => ({
-      id: Number(p.id),
-      program: p.program,
-      date: p.date,
-      location: p.location,
-      pic: p.pic,
-      status: p.status
-    })) || []
+    facilities,
+    programs
   })
 }
 
@@ -610,12 +640,13 @@ export async function updateOnboarding(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { job_placement, document, document_candidate } = request.body
+  const { job_placement, document, document_candidate, join_date } = request.body
 
   const onboarding = await candidateService.updateOnboarding(id, {
     jobPlacement: job_placement,
     document,
-    documentCandidate: document_candidate
+    documentCandidate: document_candidate,
+    joinDate: join_date
   })
 
   sendSuccess(reply, {
@@ -627,14 +658,24 @@ export async function updateOnboarding(
   }, 'Onboarding updated successfully')
 }
 
+type SendOnboardingBody = {
+  portal_base_url: string
+  join_date?: string
+  work_location?: string
+}
+
 export async function sendOnboarding(
-  request: FastifyRequest<{ Params: IdParam; Body: { portal_base_url: string } }>,
+  request: FastifyRequest<{ Params: IdParam; Body: SendOnboardingBody }>,
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { portal_base_url } = request.body
+  const { portal_base_url, join_date, work_location } = request.body
 
-  await candidateService.sendOnboardingEmail(id, portal_base_url)
+  const params: { joinDate?: string; workLocation?: string } = {}
+  if (join_date) params.joinDate = join_date
+  if (work_location) params.workLocation = work_location
+
+  await candidateService.sendOnboardingEmail(id, portal_base_url, params)
 
   sendSuccess(reply, { success: true }, 'Onboarding email sent successfully')
 }
@@ -646,15 +687,15 @@ export async function addFacility(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { inventory_no, item, qty, unit, condition, status } = request.body
+  const { item, qty, unit, condition, status, pic_employee_ids } = request.body
 
   const facility = await candidateService.addFacility(id, {
-    inventoryNo: inventory_no,
     item,
     qty,
     unit,
     condition,
-    status
+    status,
+    pic_employee_ids: pic_employee_ids || []
   })
 
   sendSuccess(reply, {
@@ -664,7 +705,8 @@ export async function addFacility(
     qty: facility.qty,
     unit: facility.unit,
     condition: facility.condition,
-    status: facility.status
+    status: facility.status,
+    pics: await enrichPics(facility.pics || [])
   }, 'Facility added successfully', 201)
 }
 
@@ -673,15 +715,15 @@ export async function updateFacility(
   reply: FastifyReply
 ): Promise<void> {
   const { facilityId } = request.params
-  const { inventory_no, item, qty, unit, condition, status } = request.body
+  const { item, qty, unit, condition, status, pic_employee_ids } = request.body
 
   const facility = await candidateService.updateFacility(facilityId, {
-    ...(inventory_no && { inventoryNo: inventory_no }),
     ...(item && { item }),
     ...(qty !== undefined && { qty }),
     ...(unit && { unit }),
     ...(condition && { condition }),
-    ...(status && { status })
+    ...(status && { status }),
+    ...(pic_employee_ids !== undefined && { pic_employee_ids })
   })
 
   sendSuccess(reply, {
@@ -691,7 +733,8 @@ export async function updateFacility(
     qty: facility.qty,
     unit: facility.unit,
     condition: facility.condition,
-    status: facility.status
+    status: facility.status,
+    pics: await enrichPics(facility.pics || [])
   }, 'Facility updated successfully')
 }
 
@@ -713,13 +756,13 @@ export async function addProgram(
   reply: FastifyReply
 ): Promise<void> {
   const { id } = request.params
-  const { program, date, location, pic, status } = request.body
+  const { program, date, location, pic_employee_ids, status } = request.body
 
   const prog = await candidateService.addProgram(id, {
     program,
     date,
     location,
-    pic,
+    pic_employee_ids: pic_employee_ids || [],
     status
   })
 
@@ -728,8 +771,9 @@ export async function addProgram(
     program: prog.program,
     date: prog.date,
     location: prog.location,
-    pic: prog.pic,
-    status: prog.status
+    pic_legacy: prog.pic_legacy,
+    status: prog.status,
+    pics: await enrichPics(prog.pics || [])
   }, 'Program added successfully', 201)
 }
 
@@ -738,13 +782,13 @@ export async function updateProgram(
   reply: FastifyReply
 ): Promise<void> {
   const { programId } = request.params
-  const { program, date, location, pic, status } = request.body
+  const { program, date, location, pic_employee_ids, status } = request.body
 
   const prog = await candidateService.updateProgram(programId, {
     ...(program && { program }),
     ...(date && { date }),
     ...(location && { location }),
-    ...(pic && { pic }),
+    ...(pic_employee_ids !== undefined && { pic_employee_ids }),
     ...(status && { status })
   })
 
@@ -753,8 +797,9 @@ export async function updateProgram(
     program: prog.program,
     date: prog.date,
     location: prog.location,
-    pic: prog.pic,
-    status: prog.status
+    pic_legacy: prog.pic_legacy,
+    status: prog.status,
+    pics: await enrichPics(prog.pics || [])
   }, 'Program updated successfully')
 }
 
