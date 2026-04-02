@@ -113,7 +113,7 @@ function getBaseLayout(params: {
           <!-- Logo -->
           <tr>
             <td style="padding: 36px 40px 20px 40px;">
-              <img src="data:image/png;base64,${logoBase64}" alt="TUV Nord" width="281" height="83" style="width: 200px; height: auto; display: block;">
+              <img src="data:image/png;base64,${logoBase64}" alt="TÜV Nord" width="281" height="83" style="width: 200px; height: auto; display: block;">
             </td>
           </tr>
 
@@ -283,7 +283,7 @@ function getWelcomeEmailTemplate(data: WelcomeEmailData & { companyName: string,
 
   return getBaseLayout({
     title: `Welcome to ${data.companyName}`,
-    heading: 'Welcome to TUV Nord Central',
+    heading: 'Welcome to TÜV Nord Central',
     greeting: `Hi, <strong>${data.displayName}</strong>!`,
     bodyHtml,
   })
@@ -876,6 +876,282 @@ export async function sendSlaOverdueEmail(data: SlaOverdueEmailData): Promise<vo
   });
 
   console.log(`[MAILGUN] SLA overdue email sent to ${data.recipientEmail}`)
+}
+
+// --- Employee Request Status Email ---
+
+export interface EmployeeRequestStatusEmailData {
+  recipientEmail: string
+  recipientName: string
+  requestCode: string
+  jobTitle: string
+  department: string
+  actionLabel: string
+  actorName: string
+  comment?: string | undefined
+  statusColor: string
+  detailUrl: string
+}
+
+function getEmployeeRequestStatusTemplate(data: EmployeeRequestStatusEmailData & { companyName: string }): string {
+  const commentSection = data.comment ? `
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border: 1px solid #e8e8e8;">
+      <tr>
+        <td style="padding: 16px 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Comment</p>
+          <p style="margin: 0; color: #333333; font-size: 14px; line-height: 1.6; font-style: italic;">"${data.comment}"</p>
+        </td>
+      </tr>
+    </table>
+  ` : ''
+
+  const bodyHtml = `
+    <!-- Status Badge -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 16px 0;">
+      <tr>
+        <td>
+          <span style="display: inline-block; padding: 6px 16px; background-color: ${data.statusColor}; color: #ffffff; font-size: 13px; font-weight: 600; border-radius: 20px;">
+            ${data.actionLabel}
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Request Details Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid ${data.statusColor};">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Request Code</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.requestCode}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Position</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.jobTitle}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Department</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px;">${data.department}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Action By</p>
+          <p style="margin: 0; color: #1a1a1a; font-size: 15px;">${data.actorName}</p>
+        </td>
+      </tr>
+    </table>
+
+    ${commentSection}
+
+    <!-- CTA Button -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 16px 0;">
+          <a href="${data.detailUrl}" style="display: inline-block; padding: 14px 32px; background-color: #0032A0; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 6px;">
+            View Request Details
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin: 12px 0 0 0; color: #888888; font-size: 13px; line-height: 1.6;">
+      If the button above doesn't work, you can copy and paste the following link into your browser:
+    </p>
+    <p style="margin: 4px 0 0 0; word-break: break-all; color: #0032A0; font-size: 13px;">
+      ${data.detailUrl}
+    </p>
+  `
+
+  return getBaseLayout({
+    title: `Employee Request ${data.actionLabel} - ${data.requestCode}`,
+    heading: 'Employee Request Update',
+    greeting: `Dear ${data.recipientName},`,
+    bodyHtml,
+  })
+}
+
+export async function sendEmployeeRequestStatusEmail(data: EmployeeRequestStatusEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getEmployeeRequestStatusTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.recipientEmail,
+    subject: `Employee Request ${data.actionLabel} - ${data.requestCode}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Employee request status email sent to ${data.recipientEmail} (${data.actionLabel})`)
+}
+
+// --- Facility PIC Email ---
+
+export interface FacilityPicEmailData {
+  picName: string
+  picEmail: string
+  candidateName: string
+  joinDate: string
+  workLocation: string
+  facilities: Array<{ item: string; qty: number; condition: string }>
+}
+
+function getFacilityPicTemplate(data: FacilityPicEmailData & { companyName: string }): string {
+  const facilityRows = data.facilities
+    .map(
+      (f) => `
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8; color: #333333; font-size: 14px;">${f.item}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8; color: #333333; font-size: 14px; text-align: center;">${f.qty}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8; color: #333333; font-size: 14px;">${f.condition}</td>
+      </tr>`
+    )
+    .join('')
+
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Akan ada karyawan baru yang bergabung. Mohon disiapkan fasilitas berikut:
+    </p>
+
+    <!-- Candidate Details Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Nama Karyawan</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.candidateName}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Tanggal Bergabung</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.joinDate}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Lokasi Kerja</p>
+          <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.workLocation}</p>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Facility Table -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+      <thead>
+        <tr>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 6px 0 0 0;">Item</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: center;">Qty</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 0 6px 0 0;">Kondisi</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${facilityRows}
+      </tbody>
+    </table>
+
+    <p style="margin: 16px 0 0 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Terima kasih.
+    </p>
+  `
+
+  return getBaseLayout({
+    title: `Persiapan Fasilitas Karyawan Baru - ${data.candidateName}`,
+    heading: 'Persiapan Fasilitas Karyawan Baru',
+    greeting: `Yth. ${data.picName},`,
+    bodyHtml,
+  })
+}
+
+export async function sendFacilityPicEmail(data: FacilityPicEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getFacilityPicTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.picEmail,
+    subject: `Persiapan Fasilitas Karyawan Baru - ${data.candidateName}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Facility PIC email sent to ${data.picEmail}`)
+}
+
+// --- Program PIC Email ---
+
+export interface ProgramPicEmailData {
+  picName: string
+  picEmail: string
+  candidateName: string
+  joinDate: string
+  programs: Array<{ program: string; date: string; location: string }>
+}
+
+function getProgramPicTemplate(data: ProgramPicEmailData & { companyName: string }): string {
+  const programRows = data.programs
+    .map(
+      (p) => `
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8; color: #333333; font-size: 14px;">${p.program}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8; color: #333333; font-size: 14px;">${p.date}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8; color: #333333; font-size: 14px;">${p.location}</td>
+      </tr>`
+    )
+    .join('')
+
+  const bodyHtml = `
+    <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Akan ada karyawan baru yang bergabung. Mohon disiapkan program onboarding berikut:
+    </p>
+
+    <!-- Candidate Details Card -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
+      <tr>
+        <td style="padding: 20px;">
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Nama Karyawan</p>
+          <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.candidateName}</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Tanggal Bergabung</p>
+          <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.joinDate}</p>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Program Table -->
+    <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+      <thead>
+        <tr>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 6px 0 0 0;">Program</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left;">Tanggal</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 0 6px 0 0;">Lokasi</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${programRows}
+      </tbody>
+    </table>
+
+    <p style="margin: 16px 0 0 0; color: #333333; font-size: 15px; line-height: 1.6;">
+      Terima kasih.
+    </p>
+  `
+
+  return getBaseLayout({
+    title: `Persiapan Program Onboarding - ${data.candidateName}`,
+    heading: 'Persiapan Program Onboarding',
+    greeting: `Yth. ${data.picName},`,
+    bodyHtml,
+  })
+}
+
+export async function sendProgramPicEmail(data: ProgramPicEmailData): Promise<void> {
+  const config = getEmailConfig()
+  const mg = getMailgunClient()
+
+  const html = getProgramPicTemplate({
+    ...data,
+    companyName: config.companyName,
+  })
+
+  await mg.messages.create(config.domain, {
+    from: `${config.fromName} <${config.from}>`,
+    to: data.picEmail,
+    subject: `Persiapan Program Onboarding - ${data.candidateName}`,
+    html,
+  })
+
+  console.log(`[MAILGUN] Program PIC email sent to ${data.picEmail}`)
 }
 
 // --- Utility Functions ---

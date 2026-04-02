@@ -2,7 +2,7 @@ import type { CandidateRecruitment } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
-import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendMcuScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail } from './emailService.js'
+import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendMcuScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail, sendFacilityPicEmail, sendProgramPicEmail } from './emailService.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
@@ -1187,7 +1187,7 @@ export async function createOnboarding(
 
 export async function updateOnboarding(
   candidateId: number,
-  data: { jobPlacement?: string | undefined; document?: string | undefined; documentCandidate?: string | undefined }
+  data: { jobPlacement?: string | undefined; document?: string | undefined; documentCandidate?: string | undefined; joinDate?: string | undefined }
 ): Promise<OnboardingWithRelations> {
   const existingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
   if (existingResult.isFailure()) {
@@ -1218,12 +1218,12 @@ export async function updateOnboarding(
 export async function addFacility(
   candidateId: number,
   data: {
-    inventoryNo: string
     item: string
     qty: number
     unit: string
     condition: string
     status: string
+    pic_employee_ids: number[]
   }
 ) {
   const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
@@ -1238,7 +1238,12 @@ export async function addFacility(
 
   const result = await onboardingRepository.createFacility({
     onboardingId: Number(onboarding.id),
-    ...data
+    item: data.item,
+    qty: data.qty,
+    unit: data.unit,
+    condition: data.condition,
+    status: data.status,
+    pic_employee_ids: data.pic_employee_ids,
   })
 
   if (result.isFailure()) {
@@ -1251,12 +1256,12 @@ export async function addFacility(
 export async function updateFacility(
   facilityId: number,
   data: {
-    inventoryNo?: string
     item?: string
     qty?: number
     unit?: string
     condition?: string
     status?: string
+    pic_employee_ids?: number[]
   }
 ) {
   const result = await onboardingRepository.updateFacility(facilityId, data)
@@ -1284,7 +1289,7 @@ export async function addProgram(
     program: string
     date: string
     location: string
-    pic: string
+    pic_employee_ids: number[]
     status: string
   }
 ) {
@@ -1300,7 +1305,11 @@ export async function addProgram(
 
   const result = await onboardingRepository.createProgram({
     onboardingId: Number(onboarding.id),
-    ...data
+    program: data.program,
+    date: data.date,
+    location: data.location,
+    status: data.status,
+    pic_employee_ids: data.pic_employee_ids,
   })
 
   if (result.isFailure()) {
@@ -1316,7 +1325,7 @@ export async function updateProgram(
     program?: string
     date?: string
     location?: string
-    pic?: string
+    pic_employee_ids?: number[]
     status?: string
   }
 ) {
@@ -1348,7 +1357,11 @@ function formatJobPlacement(value: string): string {
     .join(' ')
 }
 
-export async function sendOnboardingEmail(candidateId: number, portalBaseUrl: string): Promise<void> {
+export async function sendOnboardingEmail(
+  candidateId: number,
+  portalBaseUrl: string,
+  params?: { joinDate?: string; workLocation?: string }
+): Promise<void> {
   // Get candidate data
   const candidateResult = await candidateRepository.findById(candidateId)
   if (candidateResult.isFailure()) {
@@ -1371,25 +1384,139 @@ export async function sendOnboardingEmail(candidateId: number, portalBaseUrl: st
     throw new BadRequestError('Onboarding data not found. Please complete onboarding form first.')
   }
 
+  // Save join_date and job_placement if provided
+  const updateData: { joinDate?: string; jobPlacement?: string } = {}
+  if (params?.joinDate) updateData.joinDate = params.joinDate
+  if (params?.workLocation) updateData.jobPlacement = params.workLocation
+
+  if (Object.keys(updateData).length > 0) {
+    const saveResult = await onboardingRepository.updateOnboarding(Number(onboarding.id), updateData)
+    if (saveResult.isFailure()) {
+      console.error(`[ONBOARDING] Failed to save join_date/job_placement:`, saveResult.error)
+    }
+  }
+
   // Get job title
   const jobTitle = candidate.jobTitle?.name || 'Position'
 
-  // Format join date - assuming it's stored somewhere (you may need to add this field)
-  // For now, using current date + 14 days as placeholder if not set
-  const workLocation = formatJobPlacement(onboarding.job_placement || '')
+  // Resolve work location and join date
+  const workLocation = params?.workLocation
+    || formatJobPlacement(onboarding.job_placement || '')
+  const joinDate = params?.joinDate || onboarding.join_date || 'To be confirmed'
 
   // Portal URL for candidate to confirm
   const portalUrl = `${portalBaseUrl}/candidate-portal/onboarding`
 
-  // Send email
+  // Send candidate email
   await sendOnboardingEmailToCandidate({
     candidateName: candidate.fullname,
     candidateEmail: candidate.email,
     jobTitle,
     workLocation,
-    joinDate: 'To be confirmed', // This should come from onboarding.join_date field
+    joinDate,
     portalUrl,
   })
+
+  // --- Send PIC emails (best-effort) ---
+
+  // Re-fetch onboarding to get latest facilities/programs with pics
+  const refreshedResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+  const refreshed = refreshedResult.isSuccess() ? refreshedResult.getValue() : onboarding
+
+  const candidateName = candidate.fullname
+
+  // Group facilities by PIC employee_id
+  if (refreshed?.facilities && refreshed.facilities.length > 0) {
+    const facilityByPic = new Map<number, Array<{ item: string; qty: number; condition: string }>>()
+
+    for (const facility of refreshed.facilities) {
+      if (facility.pics && facility.pics.length > 0) {
+        for (const pic of facility.pics) {
+          const empId = pic.employee_id
+          if (!facilityByPic.has(empId)) {
+            facilityByPic.set(empId, [])
+          }
+          facilityByPic.get(empId)!.push({
+            item: facility.item,
+            qty: facility.qty,
+            condition: facility.condition,
+          })
+        }
+      }
+    }
+
+    for (const [empId, facilities] of facilityByPic) {
+      try {
+        const empResult = await employeeRepository.findById(empId)
+        if (empResult.isFailure() || !empResult.getValue()) {
+          console.error(`[PIC_EMAIL] Employee ${empId} not found, skipping facility PIC email`)
+          continue
+        }
+        const emp = empResult.getValue()!
+        if (!emp.employeeEmail) {
+          console.error(`[PIC_EMAIL] Employee ${empId} has no email, skipping facility PIC email`)
+          continue
+        }
+
+        await sendFacilityPicEmail({
+          picName: emp.employeeName || `Employee ${empId}`,
+          picEmail: emp.employeeEmail,
+          candidateName,
+          joinDate,
+          workLocation,
+          facilities,
+        })
+      } catch (err: unknown) {
+        console.error(`[PIC_EMAIL] Failed to send facility PIC email to employee ${empId}:`, err)
+      }
+    }
+  }
+
+  // Group programs by PIC employee_id
+  if (refreshed?.programs && refreshed.programs.length > 0) {
+    const programByPic = new Map<number, Array<{ program: string; date: string; location: string }>>()
+
+    for (const prog of refreshed.programs) {
+      if (prog.pics && prog.pics.length > 0) {
+        for (const pic of prog.pics) {
+          const empId = pic.employee_id
+          if (!programByPic.has(empId)) {
+            programByPic.set(empId, [])
+          }
+          programByPic.get(empId)!.push({
+            program: prog.program,
+            date: prog.date,
+            location: prog.location,
+          })
+        }
+      }
+    }
+
+    for (const [empId, programs] of programByPic) {
+      try {
+        const empResult = await employeeRepository.findById(empId)
+        if (empResult.isFailure() || !empResult.getValue()) {
+          console.error(`[PIC_EMAIL] Employee ${empId} not found, skipping program PIC email`)
+          continue
+        }
+        const emp = empResult.getValue()!
+        if (!emp.employeeEmail) {
+          console.error(`[PIC_EMAIL] Employee ${empId} has no email, skipping program PIC email`)
+          continue
+        }
+
+        await sendProgramPicEmail({
+          picName: emp.employeeName || `Employee ${empId}`,
+          picEmail: emp.employeeEmail,
+          candidateName,
+          joinDate,
+          programs,
+        })
+      } catch (err: unknown) {
+        console.error(`[PIC_EMAIL] Failed to send program PIC email to employee ${empId}:`, err)
+      }
+    }
+  }
 }
 
 // ==================== Accept Onboarding ====================

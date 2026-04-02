@@ -37,6 +37,7 @@ export type UpdateOnboardingData = {
   jobPlacement?: string | undefined
   document?: string | undefined
   documentCandidate?: string | undefined
+  joinDate?: string | undefined
 }
 
 export async function findOnboardingById(id: number): Promise<RepositoryResult<OnboardingWithRelations | null>> {
@@ -151,6 +152,7 @@ export async function updateOnboarding(
     if (data.jobPlacement !== undefined) updateData.job_placement = data.jobPlacement
     if (data.document !== undefined) updateData.document = data.document
     if (data.documentCandidate !== undefined) updateData.document_candidate = data.documentCandidate
+    if (data.joinDate !== undefined) updateData.join_date = data.joinDate
     updateData.updatedAt = new Date()
 
     const onboarding = await prisma.candidate_recruitment_onboarding.update({
