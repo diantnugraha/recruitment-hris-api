@@ -45,6 +45,7 @@ export type CreateEmployeeData = {
   religion?: string
   ethnic?: string
   nationality?: string
+  jobTitleId?: number
   motherName?: string
   fatherName?: string
   spouseName?: string
@@ -179,6 +180,7 @@ export async function create(data: CreateEmployeeData): Promise<RepositoryResult
     if (data.religion !== undefined) createData.employeeReligion = data.religion
     if (data.ethnic !== undefined) createData.employeeEthnic = data.ethnic
     if (data.nationality !== undefined) createData.employeeNationality = data.nationality
+    if (data.jobTitleId !== undefined) createData.jobTitle = { connect: { id: BigInt(data.jobTitleId) } }
     if (data.motherName !== undefined) createData.employeeMother = data.motherName
     if (data.fatherName !== undefined) createData.employeeFather = data.fatherName
     if (data.spouseName !== undefined) createData.employeeSpouse = data.spouseName

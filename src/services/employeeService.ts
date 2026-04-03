@@ -31,6 +31,8 @@ export type CreateEmployeeServiceData = {
   address?: string
   religion?: string
   ethnic?: string
+  nationality?: string
+  jobTitleId?: number
   motherName?: string
   fatherName?: string
   spouseName?: string
