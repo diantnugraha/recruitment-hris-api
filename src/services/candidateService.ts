@@ -1580,6 +1580,31 @@ export async function acceptOnboarding(candidateId: number): Promise<OnboardingW
     console.error('[NOTIFICATION] Failed to send onboarding accepted notification:', err)
   }
 
+  // Fire-and-forget: convert candidate to employee + create user + send welcome email
+  convertToEmployee(candidateId).catch(async (err) => {
+    console.error(`[CONVERT-EMPLOYEE] Failed to convert candidate ${candidateId} to employee:`, err instanceof Error ? err.message : err)
+
+    // Notify HR about conversion failure
+    try {
+      const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+      if (invitedBy) {
+        const candidateResult = await candidateRepository.findById(candidateId)
+        const candidateName = candidateResult.isSuccess()
+          ? candidateResult.getValue()?.fullname || 'Unknown'
+          : 'Unknown'
+
+        await sendRecruitmentNotification({
+          type: RECRUITMENT_NOTIFICATION_TYPE.CONVERSION_FAILED,
+          candidateId,
+          candidateName,
+          targetUserIds: [invitedBy],
+        })
+      }
+    } catch (notifErr) {
+      console.error('[CONVERT-EMPLOYEE] Failed to send conversion failure notification:', notifErr)
+    }
+  })
+
   // Fetch with relations
   const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
   if (onboardingResult.isFailure()) {
