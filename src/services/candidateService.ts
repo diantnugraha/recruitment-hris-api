@@ -9,6 +9,7 @@ import * as candidateAssessmentRepository from '../repositories/candidateAssessm
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
 import * as employeeRepository from '../repositories/employeeRepository.js'
 import * as employeeRequestRepository from '../repositories/employeeRequestRepository.js'
+import * as employeeService from './employeeService.js'
 import { prisma } from '../config/database.js'
 import { sendRecruitmentNotification } from './recruitmentNotificationHelper.js'
 import { RECRUITMENT_NOTIFICATION_TYPE } from '../constants/recruitmentNotificationConstants.js'
@@ -1417,6 +1418,11 @@ export async function sendOnboardingEmail(
     portalUrl,
   })
 
+  // Mark onboarding as sent
+  await onboardingRepository.updateOnboarding(Number(onboarding.id), {
+    onboardingSentAt: new Date(),
+  })
+
   // --- Send PIC emails (best-effort) ---
 
   // Re-fetch onboarding to get latest facilities/programs with pics
@@ -1597,6 +1603,14 @@ export async function convertToEmployee(candidateId: number): Promise<{ success:
     throw new NotFoundError('Candidate not found')
   }
 
+  // Idempotency guard: check if employee with this email already exists
+  if (candidate.email) {
+    const emailExistsResult = await employeeRepository.emailExists(candidate.email)
+    if (emailExistsResult.isSuccess() && emailExistsResult.getValue()) {
+      return { success: true, message: 'Employee already exists for this candidate' }
+    }
+  }
+
   // Check if all assessments passed
   const passedResult = await candidateAssessmentRepository.hasPassedAllAssessments(candidateId)
   if (passedResult.isFailure()) {
@@ -1617,12 +1631,67 @@ export async function convertToEmployee(candidateId: number): Promise<{ success:
     throw new BadRequestError('Onboarding must be complete (job placement, at least 1 facility, at least 1 program)')
   }
 
-  // TODO: Create employee record with data from candidate
-  // TODO: Create user account for employee
-  // TODO: Update employee request status
+  // Gather candidate detail (job_title_id, employee_request_id)
+  const detailResult = await candidateDetailRepository.findByCandidateId(candidateId)
+  if (detailResult.isFailure()) {
+    throw new Error(detailResult.error)
+  }
+  const detail = detailResult.getValue()
+  if (!detail) {
+    throw new NotFoundError('Candidate detail not found')
+  }
+
+  // Gather onboarding data (job_placement, join_date)
+  const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+  if (onboardingResult.isFailure()) {
+    throw new Error(onboardingResult.error)
+  }
+  const onboarding = onboardingResult.getValue()
+  if (!onboarding) {
+    throw new NotFoundError('Onboarding not found')
+  }
+
+  // Gather employee request data (departmentId)
+  const employeeRequestId = parseInt(detail.employee_request_id, 10)
+  const empRequestResult = await employeeRequestRepository.findById(employeeRequestId)
+  let departmentId: number | undefined
+  if (empRequestResult.isSuccess()) {
+    const empRequest = empRequestResult.getValue()
+    departmentId = empRequest?.departmentId ?? undefined
+  }
+
+  // Parse join_date (String? -> Date), fallback to current date
+  let joinDate: Date = new Date()
+  if (onboarding.join_date) {
+    const parsed = new Date(onboarding.join_date)
+    if (!isNaN(parsed.getTime())) {
+      joinDate = parsed
+    }
+  }
+
+  // Create employee via employeeService (handles user creation + welcome email internally)
+  const employeeData: import('./employeeService.js').CreateEmployeeServiceData = {
+    name: candidate.fullname,
+    joinDate,
+    status: 'active',
+    ...(candidate.email ? { email: candidate.email } : {}),
+    ...(candidate.gender ? { gender: candidate.gender } : {}),
+    ...(candidate.id_no ? { nik: candidate.id_no } : {}),
+    ...(candidate.birth_date ? { birthDate: candidate.birth_date } : {}),
+    ...(candidate.marrital_status ? { maritalStatus: candidate.marrital_status } : {}),
+    ...(candidate.religion ? { religion: candidate.religion } : {}),
+    ...(candidate.ethnic_group ? { ethnic: candidate.ethnic_group } : {}),
+    ...(candidate.citizenship ? { nationality: candidate.citizenship } : {}),
+    ...(candidate.address ? { address: candidate.address } : {}),
+    ...(candidate.mobile_phone ? { contact: candidate.mobile_phone } : {}),
+    ...(onboarding.job_placement ? { location: onboarding.job_placement } : {}),
+    ...(departmentId !== undefined ? { departmentId } : {}),
+    ...(detail.job_title_id !== undefined ? { jobTitleId: detail.job_title_id } : {}),
+  }
+  const employee = await employeeService.createEmployee(employeeData)
 
   return {
     success: true,
-    message: 'Employee record created successfully'
+    message: `Employee record created successfully (ID: ${employee.employeeId})`
   }
 }
