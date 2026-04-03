@@ -3,6 +3,7 @@ export const RECRUITMENT_NOTIFICATION_TYPE = {
   ASSESSOR_ASSIGNED: 'recruitment_assessor_assigned',
   INTERVIEW_USER_COMPLETED: 'recruitment_interview_user_completed',
   ONBOARDING_ACCEPTED: 'recruitment_onboarding_accepted',
+  CONVERSION_FAILED: 'recruitment_conversion_failed',
 } as const
 
 export type RecruitmentNotificationType =
@@ -27,5 +28,9 @@ export const RECRUITMENT_NOTIFICATION_CONFIG: Record<
   [RECRUITMENT_NOTIFICATION_TYPE.ONBOARDING_ACCEPTED]: {
     label: 'Onboarding Accepted',
     color: '#16a34a',
+  },
+  [RECRUITMENT_NOTIFICATION_TYPE.CONVERSION_FAILED]: {
+    label: 'Employee Conversion Failed',
+    color: '#dc2626',
   },
 }

@@ -36,6 +36,11 @@ function buildNotificationContent(params: NotificationParams): { title: string; 
         title: 'Onboarding Accepted',
         message: `Candidate ${candidateName} has accepted the onboarding offer`,
       }
+    case RECRUITMENT_NOTIFICATION_TYPE.CONVERSION_FAILED:
+      return {
+        title: 'Employee Conversion Failed',
+        message: `Failed to automatically convert candidate ${candidateName} to employee. Manual conversion may be required.`,
+      }
   }
 }
 
