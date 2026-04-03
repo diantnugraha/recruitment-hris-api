@@ -189,7 +189,7 @@ function autoCreateUserForEmployee(employee: Employee, email: string, name: stri
         password: plainPassword,
         roleId,
         employeeId: employee.employeeId,
-        superiorId: employee.employeeSuperiorId ?? undefined
+        superiorId: employee.superiorId ?? undefined
       })
     })
     .catch((error) => {
