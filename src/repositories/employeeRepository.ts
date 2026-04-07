@@ -69,7 +69,7 @@ export type UpdateEmployeeData = {
   joinDate?: Date
   birthDate?: Date
   permanentDate?: Date
-  superiorId?: number | null
+  superiorId?: number
   maritalStatus?: string
   nik?: string
   address?: string
@@ -138,6 +138,34 @@ export async function findById(id: number): Promise<RepositoryResult<Employee | 
   }
 }
 
+export type EmployeeNameLookup = {
+  employeeId: number
+  employeeName: string | null
+}
+
+export async function findNamesByIds(
+  ids: number[]
+): Promise<RepositoryResult<EmployeeNameLookup[]>> {
+  try {
+    if (ids.length === 0) return success([])
+
+    const employees = await prisma.employee.findMany({
+      where: {
+        employeeId: { in: ids },
+        ...ACTIVE_FILTER
+      },
+      select: {
+        employeeId: true,
+        employeeName: true
+      }
+    })
+    return success(employees)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to find employee names'
+    return failure(message)
+  }
+}
+
 export async function findByUuid(uuid: string): Promise<RepositoryResult<Employee | null>> {
   try {
     const employee = await prisma.employee.findFirst({
@@ -157,23 +185,25 @@ export async function create(data: CreateEmployeeData): Promise<RepositoryResult
   try {
     const createData: Prisma.EmployeeCreateInput = {
       uuid: randomUUID(),
-      employeeName: data.name
+      employeeName: data.name,
+      // MySQL columns are NOT NULL — always provide a sane default so the
+      // INSERT never fails when callers (e.g. onboarding conversion) omit them.
+      employeeStatus: data.status ?? 'active',
+      superiorId: data.superiorId ?? 0
     }
 
     if (data.nickname !== undefined) createData.employeeNickname = data.nickname
     if (data.email !== undefined) createData.employeeEmail = data.email
     if (data.contact !== undefined) createData.employeeContact = data.contact
     if (data.gender !== undefined) createData.employeeGender = data.gender
-    if (data.status !== undefined) createData.employeeStatus = data.status
     if (data.title !== undefined) createData.employeeTitle = data.title
-    if (data.departmentId !== undefined) createData.departmentId = data.departmentId
+    if (data.departmentId !== undefined) createData.department = { connect: { id: data.departmentId } }
     if (data.location !== undefined) createData.employeeLocation = data.location
     if (data.businessUnit !== undefined) createData.employeeBu = data.businessUnit
     if (data.extension !== undefined) createData.employeeExt = data.extension
     if (data.joinDate !== undefined) createData.employeeJoindate = data.joinDate
     if (data.birthDate !== undefined) createData.employeeBirthdate = data.birthDate
     if (data.permanentDate !== undefined) createData.employeePermanentdate = data.permanentDate
-    if (data.superiorId !== undefined) createData.superiorId = data.superiorId
     if (data.nik !== undefined) createData.employeeNik = data.nik
     if (data.maritalStatus !== undefined) createData.employeeMaritalstatus = data.maritalStatus
     if (data.address !== undefined) createData.employeeAddress = data.address
@@ -207,7 +237,7 @@ export async function update(id: number, data: UpdateEmployeeData): Promise<Repo
     if (data.gender !== undefined) updateData.employeeGender = data.gender
     if (data.status !== undefined) updateData.employeeStatus = data.status
     if (data.title !== undefined) updateData.employeeTitle = data.title
-    if (data.departmentId !== undefined) updateData.departmentId = data.departmentId
+    if (data.departmentId !== undefined) updateData.department = { connect: { id: data.departmentId } }
     if (data.location !== undefined) updateData.employeeLocation = data.location
     if (data.businessUnit !== undefined) updateData.employeeBu = data.businessUnit
     if (data.extension !== undefined) updateData.employeeExt = data.extension

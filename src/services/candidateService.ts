@@ -1,18 +1,22 @@
-import type { CandidateRecruitment } from '@prisma/client'
+import type { CandidateRecruitment, Prisma } from '@prisma/client'
 import { randomBytes } from 'crypto'
+import bcrypt from 'bcryptjs'
 
 import { NotFoundError, ConflictError, BadRequestError } from '../errors/index.js'
-import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendMcuScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail, sendFacilityPicEmail, sendProgramPicEmail } from './emailService.js'
+import { sendCandidateInvitationEmail, sendInterviewAssignmentEmail, sendInterviewScheduleEmail, sendMcuScheduleEmail, sendOnboardingEmail as sendOnboardingEmailToCandidate, sendCandidateRejectionEmail, sendFacilityPicEmail, sendProgramPicEmail, sendWelcomeEmail } from './emailService.js'
 import * as candidateRepository from '../repositories/candidateRepository.js'
 import * as candidateDetailRepository from '../repositories/candidateDetailRepository.js'
 import * as candidateAssessmentRepository from '../repositories/candidateAssessmentRepository.js'
 import * as onboardingRepository from '../repositories/onboardingRepository.js'
+import * as onboardingConversionRepository from '../repositories/onboardingConversionRepository.js'
 import * as employeeRepository from '../repositories/employeeRepository.js'
 import * as employeeRequestRepository from '../repositories/employeeRequestRepository.js'
-import * as employeeService from './employeeService.js'
+import * as roleRepository from '../repositories/roleRepository.js'
 import { prisma } from '../config/database.js'
 import { sendRecruitmentNotification } from './recruitmentNotificationHelper.js'
 import { RECRUITMENT_NOTIFICATION_TYPE } from '../constants/recruitmentNotificationConstants.js'
+
+const DEFAULT_EMPLOYEE_ROLE_NAME = 'Employee'
 import type {
   CandidateFilters,
   PaginationParams,
@@ -20,11 +24,6 @@ import type {
 } from '../repositories/candidateRepository.js'
 import type { AssessmentStatus, AssessmentProgress } from '../repositories/candidateAssessmentRepository.js'
 import type { OnboardingWithRelations } from '../repositories/onboardingRepository.js'
-
-// Generate random 8-character password (alphanumeric)
-function generateRandomPassword(): string {
-  return randomBytes(4).toString('hex').toUpperCase()
-}
 
 // ==================== Type Definitions ====================
 
@@ -1527,136 +1526,80 @@ export async function sendOnboardingEmail(
 
 // ==================== Accept Onboarding ====================
 
+/**
+ * Candidate accepts onboarding offer.
+ *
+ * Runs an atomic transaction that:
+ *   1. Sets onboarding_accepted_at = NOW
+ *   2. Marks the employee_request as completed (status 7)
+ *   3. Inserts the employee_list row (with superior_id = 0 by default)
+ *   4. Inserts the users row (Employee role) linked to the new employee
+ *
+ * If the transaction fails, ALL writes roll back so the candidate stays in
+ * "awaiting acceptance" and can safely retry once HR resolves the underlying
+ * issue. Welcome email + HR notifications are sent fire-and-forget AFTER the
+ * transaction commits.
+ */
 export async function acceptOnboarding(candidateId: number): Promise<OnboardingWithRelations> {
-  // Check if onboarding exists
-  const existingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
-  if (existingResult.isFailure()) {
-    throw new Error(existingResult.error)
-  }
+  // ---- Preflight (read-only) ----------------------------------------------
 
-  const existing = existingResult.getValue()
-  if (!existing) {
-    throw new NotFoundError('Onboarding not found for this candidate')
-  }
-
-  // Check if already accepted
-  if (existing.onboardingAcceptedAt) {
-    throw new BadRequestError('Onboarding has already been accepted')
-  }
-
-  // Accept onboarding
-  const acceptResult = await onboardingRepository.acceptOnboarding(candidateId)
-  if (acceptResult.isFailure()) {
-    throw new Error(acceptResult.error)
-  }
-
-  // Update employee request status to completed (7)
-  const employeeRequestId = existing.employee_request_id
-  const updateResult = await employeeRequestRepository.update(employeeRequestId, {
-    statusEmployeeRequest: 7 // completed
-  })
-  if (updateResult.isFailure()) {
-    console.error('Failed to update employee request status:', updateResult.error)
-    // Don't throw - onboarding acceptance is more important
-  }
-
-  // Send in-app notification to HR who invited the candidate
-  try {
-    const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
-    if (invitedBy) {
-      const candidate = await candidateRepository.findById(candidateId)
-      const candidateName = candidate.isSuccess()
-        ? candidate.getValue()?.fullname || 'Unknown'
-        : 'Unknown'
-
-      await sendRecruitmentNotification({
-        type: RECRUITMENT_NOTIFICATION_TYPE.ONBOARDING_ACCEPTED,
-        candidateId,
-        candidateName,
-        targetUserIds: [invitedBy],
-      })
-    }
-  } catch (err) {
-    console.error('[NOTIFICATION] Failed to send onboarding accepted notification:', err)
-  }
-
-  // Fire-and-forget: convert candidate to employee + create user + send welcome email
-  convertToEmployee(candidateId).catch(async (err) => {
-    console.error(`[CONVERT-EMPLOYEE] Failed to convert candidate ${candidateId} to employee:`, err instanceof Error ? err.message : err)
-
-    // Notify HR about conversion failure
-    try {
-      const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
-      if (invitedBy) {
-        const candidateResult = await candidateRepository.findById(candidateId)
-        const candidateName = candidateResult.isSuccess()
-          ? candidateResult.getValue()?.fullname || 'Unknown'
-          : 'Unknown'
-
-        await sendRecruitmentNotification({
-          type: RECRUITMENT_NOTIFICATION_TYPE.CONVERSION_FAILED,
-          candidateId,
-          candidateName,
-          targetUserIds: [invitedBy],
-        })
-      }
-    } catch (notifErr) {
-      console.error('[CONVERT-EMPLOYEE] Failed to send conversion failure notification:', notifErr)
-    }
-  })
-
-  // Fetch with relations
   const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
   if (onboardingResult.isFailure()) {
     throw new Error(onboardingResult.error)
   }
-
-  return onboardingResult.getValue()!
-}
-
-// ==================== Convert to Employee ====================
-
-export async function convertToEmployee(candidateId: number): Promise<{ success: boolean; message: string }> {
-  // Check if candidate exists
-  const candidateResult = await candidateRepository.findById(candidateId)
-  if (candidateResult.isFailure()) {
-    throw new Error(candidateResult.error)
+  const onboarding = onboardingResult.getValue()
+  if (!onboarding) {
+    throw new NotFoundError('Onboarding not found for this candidate')
   }
 
-  const candidate = candidateResult.getValue()
-  if (!candidate) {
-    throw new NotFoundError('Candidate not found')
+  // Pre-transaction guard #1: idempotency by acceptance timestamp
+  if (onboarding.onboardingAcceptedAt) {
+    throw new ConflictError('Onboarding has already been accepted')
   }
 
-  // Idempotency guard: check if employee with this email already exists
-  if (candidate.email) {
-    const emailExistsResult = await employeeRepository.emailExists(candidate.email)
-    if (emailExistsResult.isSuccess() && emailExistsResult.getValue()) {
-      return { success: true, message: 'Employee already exists for this candidate' }
-    }
-  }
-
-  // Check if all assessments passed
+  // Pre-transaction guard #2: assessments must all pass
   const passedResult = await candidateAssessmentRepository.hasPassedAllAssessments(candidateId)
   if (passedResult.isFailure()) {
     throw new Error(passedResult.error)
   }
-
   if (!passedResult.getValue()) {
-    throw new BadRequestError('Candidate must pass all assessments before converting to employee')
+    throw new BadRequestError('Candidate must pass all assessments before accepting onboarding')
   }
 
-  // Check if onboarding is complete
+  // Pre-transaction guard #3: onboarding must be complete (job placement,
+  // at least 1 facility, at least 1 program)
   const onboardingCompleteResult = await onboardingRepository.isOnboardingComplete(candidateId)
   if (onboardingCompleteResult.isFailure()) {
     throw new Error(onboardingCompleteResult.error)
   }
-
   if (!onboardingCompleteResult.getValue()) {
     throw new BadRequestError('Onboarding must be complete (job placement, at least 1 facility, at least 1 program)')
   }
 
-  // Gather candidate detail (job_title_id, employee_request_id)
+  // Load candidate
+  const candidateResult = await candidateRepository.findById(candidateId)
+  if (candidateResult.isFailure()) {
+    throw new Error(candidateResult.error)
+  }
+  const candidate = candidateResult.getValue()
+  if (!candidate) {
+    throw new NotFoundError('Candidate not found')
+  }
+  if (!candidate.email) {
+    throw new BadRequestError('Candidate has no email — cannot create user account')
+  }
+
+  // Pre-transaction guard #4: idempotency by employee email — covers the case
+  // where an Employee row already exists from a previous successful run.
+  const emailExistsResult = await employeeRepository.emailExists(candidate.email)
+  if (emailExistsResult.isFailure()) {
+    throw new Error(emailExistsResult.error)
+  }
+  if (emailExistsResult.getValue()) {
+    throw new ConflictError('Onboarding already accepted')
+  }
+
+  // Load candidate detail (job_title_id, employee_request_id)
   const detailResult = await candidateDetailRepository.findByCandidateId(candidateId)
   if (detailResult.isFailure()) {
     throw new Error(detailResult.error)
@@ -1666,24 +1609,29 @@ export async function convertToEmployee(candidateId: number): Promise<{ success:
     throw new NotFoundError('Candidate detail not found')
   }
 
-  // Gather onboarding data (job_placement, join_date)
-  const onboardingResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
-  if (onboardingResult.isFailure()) {
-    throw new Error(onboardingResult.error)
-  }
-  const onboarding = onboardingResult.getValue()
-  if (!onboarding) {
-    throw new NotFoundError('Onboarding not found')
+  // Resolve employee request → departmentId (optional, walk-in candidates may not have one)
+  let departmentId: number | undefined
+  let employeeRequestId: number | null = null
+  const parsedRequestId = parseInt(detail.employee_request_id, 10)
+  if (!isNaN(parsedRequestId) && parsedRequestId > 0) {
+    employeeRequestId = parsedRequestId
+    const empRequestResult = await employeeRequestRepository.findById(parsedRequestId)
+    if (empRequestResult.isSuccess()) {
+      departmentId = empRequestResult.getValue()?.departmentId ?? undefined
+    }
   }
 
-  // Gather employee request data (departmentId)
-  const employeeRequestId = parseInt(detail.employee_request_id, 10)
-  const empRequestResult = await employeeRequestRepository.findById(employeeRequestId)
-  let departmentId: number | undefined
-  if (empRequestResult.isSuccess()) {
-    const empRequest = empRequestResult.getValue()
-    departmentId = empRequest?.departmentId ?? undefined
+  // Resolve "Employee" role
+  const roleResult = await roleRepository.findByName(DEFAULT_EMPLOYEE_ROLE_NAME)
+  if (roleResult.isFailure()) {
+    throw new Error(roleResult.error)
   }
+  const role = roleResult.getValue()
+  if (!role) {
+    throw new Error(`Default role "${DEFAULT_EMPLOYEE_ROLE_NAME}" not found in role_access table`)
+  }
+
+  // ---- Build transaction payload (no DB writes) ---------------------------
 
   // Parse join_date (String? -> Date), fallback to current date
   let joinDate: Date = new Date()
@@ -1694,29 +1642,125 @@ export async function convertToEmployee(candidateId: number): Promise<{ success:
     }
   }
 
-  // Create employee via employeeService (handles user creation + welcome email internally)
-  const employeeData: import('./employeeService.js').CreateEmployeeServiceData = {
-    name: candidate.fullname,
-    joinDate,
-    status: 'active',
-    ...(candidate.email ? { email: candidate.email } : {}),
-    ...(candidate.gender ? { gender: candidate.gender } : {}),
-    ...(candidate.id_no ? { nik: candidate.id_no } : {}),
-    ...(candidate.birth_date ? { birthDate: candidate.birth_date } : {}),
-    ...(candidate.marrital_status ? { maritalStatus: candidate.marrital_status } : {}),
-    ...(candidate.religion ? { religion: candidate.religion } : {}),
-    ...(candidate.ethnic_group ? { ethnic: candidate.ethnic_group } : {}),
-    ...(candidate.citizenship ? { nationality: candidate.citizenship } : {}),
-    ...(candidate.address ? { address: candidate.address } : {}),
-    ...(candidate.mobile_phone ? { contact: candidate.mobile_phone } : {}),
-    ...(onboarding.job_placement ? { location: onboarding.job_placement } : {}),
-    ...(departmentId !== undefined ? { departmentId } : {}),
-    ...(detail.job_title_id !== undefined ? { jobTitleId: detail.job_title_id } : {}),
+  const employeeData: Prisma.EmployeeCreateInput = {
+    uuid: randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5'),
+    employeeName: candidate.fullname,
+    employeeStatus: 'active',
+    superiorId: 0,
+    employeeJoindate: joinDate,
+    employeeEmail: candidate.email,
+    ...(candidate.gender ? { employeeGender: candidate.gender } : {}),
+    ...(candidate.id_no ? { employeeNik: candidate.id_no } : {}),
+    ...(candidate.birth_date ? { employeeBirthdate: candidate.birth_date } : {}),
+    ...(candidate.marrital_status ? { employeeMaritalstatus: candidate.marrital_status } : {}),
+    ...(candidate.religion ? { employeeReligion: candidate.religion } : {}),
+    ...(candidate.ethnic_group ? { employeeEthnic: candidate.ethnic_group } : {}),
+    ...(candidate.citizenship ? { employeeNationality: candidate.citizenship } : {}),
+    ...(candidate.address ? { employeeAddress: candidate.address } : {}),
+    ...(candidate.mobile_phone ? { employeeContact: candidate.mobile_phone } : {}),
+    ...(onboarding.job_placement ? { employeeLocation: onboarding.job_placement } : {}),
+    ...(departmentId !== undefined ? { department: { connect: { id: departmentId } } } : {}),
+    ...(detail.job_title_id ? { jobTitle: { connect: { id: BigInt(detail.job_title_id) } } } : {})
   }
-  const employee = await employeeService.createEmployee(employeeData)
 
-  return {
-    success: true,
-    message: `Employee record created successfully (ID: ${employee.employeeId})`
+  const generatedPassword = generateRandomPassword()
+  const hashedPassword = await bcrypt.hash(generatedPassword, 10)
+
+  const userData: Omit<Prisma.UserUncheckedCreateInput, 'employeeId'> = {
+    name: candidate.fullname,
+    displayName: candidate.fullname,
+    email: candidate.email,
+    password: hashedPassword,
+    roleId: role.roleId
   }
+
+  // ---- Transaction --------------------------------------------------------
+
+  const conversionResult = await onboardingConversionRepository.acceptOnboardingAndConvert({
+    candidateId,
+    onboardingId: onboarding.id,
+    employeeRequestId,
+    employee: employeeData,
+    user: userData
+  })
+
+  if (conversionResult.isFailure()) {
+    // Transaction rolled back — notify HR with the error and re-throw so the
+    // candidate sees a generic error toast.
+    const errorMessage = conversionResult.error
+    console.error(`[ACCEPT-ONBOARDING] Conversion transaction failed for candidate ${candidateId}:`, errorMessage)
+
+    notifyHrConversionFailed(candidateId, errorMessage).catch((notifErr) => {
+      console.error('[ACCEPT-ONBOARDING] Failed to send conversion failure notification:', notifErr)
+    })
+
+    throw new Error(`Failed to accept onboarding: ${errorMessage}`)
+  }
+
+  const { employeeId, userId } = conversionResult.getValue()
+  console.log(`[ACCEPT-ONBOARDING] Candidate ${candidateId} converted: employee=${employeeId}, user=${userId}`)
+
+  // ---- Post-commit side effects (fire-and-forget) -------------------------
+
+  sendWelcomeEmail({
+    email: candidate.email,
+    displayName: candidate.fullname,
+    password: generatedPassword
+  }).catch((err) => {
+    console.error(`[ACCEPT-ONBOARDING] Failed to send welcome email to ${candidate.email}:`, err)
+  })
+
+  notifyHrOnboardingAccepted(candidateId, candidate.fullname, employeeId).catch((notifErr) => {
+    console.error('[ACCEPT-ONBOARDING] Failed to send onboarding accepted notification:', notifErr)
+  })
+
+  // Re-fetch with relations so the candidate UI gets a consistent payload
+  const refreshedResult = await onboardingRepository.findOnboardingByCandidateId(candidateId)
+  if (refreshedResult.isFailure()) {
+    throw new Error(refreshedResult.error)
+  }
+  return refreshedResult.getValue()!
+}
+
+// Generate random 8-character password (alphanumeric, uppercase hex)
+function generateRandomPassword(): string {
+  return randomBytes(4).toString('hex').toUpperCase()
+}
+
+async function notifyHrOnboardingAccepted(
+  candidateId: number,
+  candidateName: string,
+  employeeId: number
+): Promise<void> {
+  const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+  if (!invitedBy) return
+
+  await sendRecruitmentNotification({
+    type: RECRUITMENT_NOTIFICATION_TYPE.ONBOARDING_ACCEPTED,
+    candidateId,
+    candidateName,
+    targetUserIds: [invitedBy],
+    extra: `employee_id=${employeeId}`
+  })
+}
+
+async function notifyHrConversionFailed(
+  candidateId: number,
+  errorMessage: string
+): Promise<void> {
+  const invitedBy = await candidateDetailRepository.getInvitedBy(candidateId)
+  if (!invitedBy) return
+
+  const candidateResult = await candidateRepository.findById(candidateId)
+  const candidateName = candidateResult.isSuccess()
+    ? candidateResult.getValue()?.fullname || 'Unknown'
+    : 'Unknown'
+
+  await sendRecruitmentNotification({
+    type: RECRUITMENT_NOTIFICATION_TYPE.CONVERSION_FAILED,
+    candidateId,
+    candidateName,
+    targetUserIds: [invitedBy],
+    extra: errorMessage
+  })
 }

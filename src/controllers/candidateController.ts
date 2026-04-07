@@ -148,7 +148,8 @@ function transformCandidate(candidate: CandidateWithDetail) {
       code: candidate.employeeRequest.code,
       job_placement: candidate.employeeRequest.jobPlacement
     } : null,
-    onboarding_accepted_at: candidate.onboarding?.onboardingAcceptedAt?.toISOString() || null
+    onboarding_accepted_at: candidate.onboarding?.onboardingAcceptedAt?.toISOString() || null,
+    onboarding_sent_at: candidate.onboarding?.onboardingSentAt?.toISOString() || null
   }
 }
 
@@ -614,6 +615,7 @@ export async function getOnboarding(
     document_candidate: onboarding.document_candidate,
     join_date: onboarding.join_date || null,
     onboarding_accepted_at: onboarding.onboardingAcceptedAt?.toISOString() || null,
+    onboarding_sent_at: onboarding.onboardingSentAt?.toISOString() || null,
     facilities,
     programs
   })
@@ -812,19 +814,6 @@ export async function deleteProgram(
   await candidateService.deleteProgram(programId)
 
   reply.status(204).send()
-}
-
-// ==================== Convert to Employee ====================
-
-export async function convertToEmployee(
-  request: FastifyRequest<{ Params: IdParam }>,
-  reply: FastifyReply
-): Promise<void> {
-  const { id } = request.params
-
-  const result = await candidateService.convertToEmployee(id)
-
-  sendSuccess(reply, result, 'Candidate converted to employee successfully')
 }
 
 // ==================== Biodata Endpoints ====================

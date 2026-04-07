@@ -142,7 +142,7 @@ export async function create(data: CreateUserRestData): Promise<RepositoryResult
       data: {
         displayName: data.displayName,
         email: data.email,
-        name: data.name,
+        name: data.name ?? data.displayName,
         password: data.password || '',
         roleId: data.roleId || 1,
         employeeId: data.employeeId,

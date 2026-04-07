@@ -300,13 +300,4 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     '/:id/onboarding/programs/:programId',
     candidateController.deleteProgram
   )
-
-  // ==================== Convert to Employee ====================
-
-  // Convert candidate to employee (after onboarding complete)
-  app.post<{ Params: IdParam }>(
-    '/:id/convert-to-employee',
-    { schema: { params: IdParamSchema } },
-    candidateController.convertToEmployee
-  )
 }
