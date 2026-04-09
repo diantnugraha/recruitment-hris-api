@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as jobLevelController from '../controllers/jobLevelController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { requireHrRole } from '../middlewares/roleMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
 import {
   JobLevelQuerySchema,
@@ -29,13 +30,14 @@ export async function jobLevelRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: CreateJobLevelBody }>(
     '/',
-    { schema: { body: CreateJobLevelBodySchema } },
+    { preHandler: requireHrRole, schema: { body: CreateJobLevelBodySchema } },
     jobLevelController.create
   )
 
   app.put<{ Params: IdParam; Body: UpdateJobLevelBody }>(
     '/:id',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: UpdateJobLevelBodySchema
@@ -46,7 +48,7 @@ export async function jobLevelRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: IdParam }>(
     '/:id',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     jobLevelController.remove
   )
 }
