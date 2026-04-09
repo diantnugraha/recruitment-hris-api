@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as departmentController from '../controllers/departmentController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { requireHrRole } from '../middlewares/roleMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
 import {
   DepartmentQuerySchema,
@@ -31,13 +32,14 @@ export async function departmentRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: CreateDepartmentBody }>(
     '/',
-    { schema: { body: CreateDepartmentBodySchema } },
+    { preHandler: requireHrRole, schema: { body: CreateDepartmentBodySchema } },
     departmentController.create
   )
 
   app.put<{ Params: IdParam; Body: UpdateDepartmentBody }>(
     '/:id',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: UpdateDepartmentBodySchema
@@ -48,7 +50,7 @@ export async function departmentRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: IdParam }>(
     '/:id',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     departmentController.remove
   )
 
@@ -56,6 +58,7 @@ export async function departmentRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: IdParam; Body: AssignManagerBody }>(
     '/:id/manager',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: AssignManagerBodySchema
@@ -67,7 +70,7 @@ export async function departmentRoutes(app: FastifyInstance): Promise<void> {
   // Remove Manager
   app.delete<{ Params: IdParam }>(
     '/:id/manager',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     departmentController.removeManager
   )
 }
