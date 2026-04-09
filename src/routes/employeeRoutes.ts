@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as employeeController from '../controllers/employeeController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { requireHrRole } from '../middlewares/roleMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
 import {
   EmployeeQuerySchema,
@@ -31,13 +32,14 @@ export async function employeeRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: CreateEmployeeBody }>(
     '/',
-    { schema: { body: CreateEmployeeBodySchema } },
+    { preHandler: requireHrRole, schema: { body: CreateEmployeeBodySchema } },
     employeeController.create
   )
 
   app.put<{ Params: IdParam; Body: UpdateEmployeeBody }>(
     '/:id',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: UpdateEmployeeBodySchema
@@ -48,7 +50,7 @@ export async function employeeRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: IdParam }>(
     '/:id',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     employeeController.remove
   )
 
