@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as obsController from '../controllers/obsController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { requireHrRole } from '../middlewares/roleMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
 import {
   ObsQuerySchema,
@@ -29,13 +30,14 @@ export async function obsRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: CreateObsBody }>(
     '/',
-    { schema: { body: CreateObsBodySchema } },
+    { preHandler: requireHrRole, schema: { body: CreateObsBodySchema } },
     obsController.create
   )
 
   app.put<{ Params: IdParam; Body: UpdateObsBody }>(
     '/:id',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: UpdateObsBodySchema
@@ -46,7 +48,7 @@ export async function obsRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: IdParam }>(
     '/:id',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     obsController.remove
   )
 }
