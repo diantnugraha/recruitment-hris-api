@@ -13,6 +13,7 @@ export interface JwtTokenPayload {
 }
 
 export interface JwtPayload extends JwtTokenPayload {
+  roleId: number
   roleName: string
 }
 
@@ -58,6 +59,7 @@ export async function authenticate(
     request.user = {
       userId: decoded.userId,
       email: decoded.email,
+      roleId: user.roleId,
       roleName,
     }
   } catch (error) {
