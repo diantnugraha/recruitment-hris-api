@@ -4,8 +4,11 @@
 export const ROLE_NAME_MAP: Record<string, string> = {
   'admin': 'admin',
   'Administrator': 'admin',
-  'Human Resources': 'hr',
+  'Human Resources': 'hr_staff',
+  'HR Manager': 'hr',
   'Management': 'management',
+  'Head Of Division': 'hod',
+  'PC Head/Manager': 'manager',
 }
 
 // Reverse: shorthand → display name (for UI if needed)

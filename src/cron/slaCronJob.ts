@@ -10,7 +10,7 @@ async function getHrUsers(): Promise<Array<{ id: number; email: string; name: st
   const users = await prisma.user.findMany({
     where: {
       role: {
-        roleName: { in: ['Human Resources', 'HR Manager', 'admin'] },
+        roleName: { in: ['HR Manager', 'admin'] },
       },
       trash: null,
     },

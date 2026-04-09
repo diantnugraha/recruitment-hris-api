@@ -11,10 +11,15 @@ import type { EnrichedUser } from '../middlewares/enrichUserContext.js'
 import {
   EMPLOYEE_REQUEST_STATUS,
   WORKFLOW_TRANSITIONS,
-  type EmployeeRequestStatus
+  ER_NOTIFICATION_TYPE,
+  ER_NOTIFICATION_CONFIG,
+  type EmployeeRequestStatus,
+  type ErNotificationType
 } from '../constants/employeeRequestConstants.js'
 import { prisma } from '../config/database.js'
 import { getRestBudget } from './employeeBudgetService.js'
+import * as notificationRepository from '../repositories/notificationRepository.js'
+import { sendEmployeeRequestStatusEmail } from './emailService.js'
 
 export type CreateEmployeeRequestServiceData = {
   jobTitleId: number
@@ -106,6 +111,156 @@ async function validateBudgetForRequest(jobTitleId: number): Promise<void> {
   }
 }
 
+// --- Notification helpers ---
+
+type NotificationTarget = { userId: number; email: string; name: string }
+
+function getNotificationType(targetStatus: EmployeeRequestStatus): ErNotificationType | null {
+  switch (targetStatus) {
+    case EMPLOYEE_REQUEST_STATUS.CREATED:
+      return ER_NOTIFICATION_TYPE.SUBMITTED
+    case EMPLOYEE_REQUEST_STATUS.HOD_REVIEWED:
+      return ER_NOTIFICATION_TYPE.HOD_APPROVED
+    case EMPLOYEE_REQUEST_STATUS.REVIEWED:
+      return ER_NOTIFICATION_TYPE.HR_APPROVED
+    case EMPLOYEE_REQUEST_STATUS.APPROVED:
+      return ER_NOTIFICATION_TYPE.APPROVED
+    case EMPLOYEE_REQUEST_STATUS.REVISE:
+      return ER_NOTIFICATION_TYPE.REVISED
+    case EMPLOYEE_REQUEST_STATUS.REJECTED:
+      return ER_NOTIFICATION_TYPE.REJECTED
+    default:
+      return null
+  }
+}
+
+async function resolveNotificationTargets(
+  request: EmployeeRequestWithRelations,
+  targetStatus: EmployeeRequestStatus
+): Promise<NotificationTarget[]> {
+  const userSelect = { id: true, email: true, displayName: true }
+
+  switch (targetStatus) {
+    case EMPLOYEE_REQUEST_STATUS.CREATED: {
+      // Notify HOD of the request's division (structural lookup)
+      if (!request.departmentId) return []
+      const dept = await prisma.department.findUnique({
+        where: { id: request.departmentId },
+        select: { divisionId: true },
+      })
+      if (!dept) return []
+      const division = await prisma.division.findUnique({
+        where: { id: dept.divisionId },
+        select: { headOfDivisionId: true },
+      })
+      if (!division?.headOfDivisionId) return []
+      const user = await prisma.user.findFirst({
+        where: { employeeId: division.headOfDivisionId, trash: null },
+        select: userSelect,
+      })
+      return user ? [{ userId: user.id, email: user.email, name: user.displayName }] : []
+    }
+
+    case EMPLOYEE_REQUEST_STATUS.HOD_REVIEWED: {
+      // Notify HR Manager users only
+      const hrUsers = await prisma.user.findMany({
+        where: { role: { roleName: 'HR Manager' }, trash: null },
+        select: userSelect,
+      })
+      return hrUsers.map(u => ({ userId: u.id, email: u.email, name: u.displayName }))
+    }
+
+    case EMPLOYEE_REQUEST_STATUS.REVIEWED: {
+      // Notify all Management users
+      const mgmtUsers = await prisma.user.findMany({
+        where: { role: { roleName: 'Management' }, trash: null },
+        select: userSelect,
+      })
+      return mgmtUsers.map(u => ({ userId: u.id, email: u.email, name: u.displayName }))
+    }
+
+    case EMPLOYEE_REQUEST_STATUS.APPROVED: {
+      // Notify HR Manager + requester
+      const hrUsers = await prisma.user.findMany({
+        where: { role: { roleName: 'HR Manager' }, trash: null },
+        select: userSelect,
+      })
+      const requester = await prisma.user.findFirst({
+        where: { id: request.createdBy, trash: null },
+        select: userSelect,
+      })
+      const targets: NotificationTarget[] = hrUsers.map(u => ({ userId: u.id, email: u.email, name: u.displayName }))
+      if (requester && !targets.some(t => t.userId === requester.id)) {
+        targets.push({ userId: requester.id, email: requester.email, name: requester.displayName })
+      }
+      return targets
+    }
+
+    case EMPLOYEE_REQUEST_STATUS.REVISE:
+    case EMPLOYEE_REQUEST_STATUS.REJECTED: {
+      // Notify requester only
+      const requester = await prisma.user.findFirst({
+        where: { id: request.createdBy, trash: null },
+        select: userSelect,
+      })
+      return requester ? [{ userId: requester.id, email: requester.email, name: requester.displayName }] : []
+    }
+
+    default:
+      return []
+  }
+}
+
+async function sendStatusNotifications(
+  request: EmployeeRequestWithRelations,
+  targetStatus: EmployeeRequestStatus,
+  actorName: string,
+  comment?: string
+): Promise<void> {
+  const notificationType = getNotificationType(targetStatus)
+  if (!notificationType) return
+
+  const config = ER_NOTIFICATION_CONFIG[notificationType]
+  const targets = await resolveNotificationTargets(request, targetStatus)
+  if (targets.length === 0) return
+
+  const requestCode = request.code
+  const jobTitle = request.jobTitle?.name || 'Unknown Position'
+  const department = request.department?.name || 'Unknown Department'
+  const frontendUrl = process.env.FRONTEND_URL || ''
+  const detailUrl = `${frontendUrl}/employee-request/${request.id}`
+
+  const title = `Employee Request ${requestCode} - ${config.label}`
+  const message = `Request ${requestCode} for ${jobTitle} has been ${config.label} by ${actorName}`
+
+  // Create notifications and send emails in parallel
+  const promises = targets.flatMap(target => [
+    notificationRepository.upsertByReference({
+      userId: target.userId,
+      type: notificationType,
+      title,
+      message,
+      referenceType: 'employee_request',
+      referenceId: request.id,
+    }).catch(err => console.error(`[NOTIFICATION] Failed to create notification for user ${target.userId}:`, err)),
+
+    sendEmployeeRequestStatusEmail({
+      recipientEmail: target.email,
+      recipientName: target.name,
+      requestCode,
+      jobTitle,
+      department,
+      actionLabel: config.label,
+      actorName,
+      comment,
+      statusColor: config.color,
+      detailUrl,
+    }).catch(err => console.error(`[EMAIL] Failed to send status email to ${target.email}:`, err)),
+  ])
+
+  await Promise.allSettled(promises)
+}
+
 export async function getAllEmployeeRequests(
   filters: EmployeeRequestFilters,
   pagination: PaginationParams,
@@ -155,6 +310,23 @@ export async function createEmployeeRequest(data: CreateEmployeeRequestServiceDa
     userId: data.createdBy,
     comment: commentText
   })
+
+  // Trigger notification if created directly as 'created' (submitted on create)
+  if (data.status === 'created') {
+    try {
+      const createdByUser = await prisma.user.findFirst({
+        where: { id: data.createdBy },
+        select: { displayName: true },
+      })
+      await sendStatusNotifications(
+        employeeRequest,
+        EMPLOYEE_REQUEST_STATUS.CREATED,
+        createdByUser?.displayName || 'System'
+      )
+    } catch (err) {
+      console.error('[NOTIFICATION] Failed to send notifications on create:', err)
+    }
+  }
 
   return employeeRequest
 }
@@ -332,7 +504,20 @@ export async function updateEmployeeRequestStatus(
     comment: commentText
   })
 
-  return result.getValue()
+  const updatedRequest = result.getValue()
+
+  // Trigger notifications for status change
+  try {
+    const actor = await prisma.user.findFirst({
+      where: { id: user.userId },
+      select: { displayName: true },
+    })
+    await sendStatusNotifications(updatedRequest, targetStatus, actor?.displayName || 'System', comment)
+  } catch (err) {
+    console.error('[NOTIFICATION] Failed to send notifications on status change:', err)
+  }
+
+  return updatedRequest
 }
 
 export async function addComment(
