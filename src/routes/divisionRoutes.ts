@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as divisionController from '../controllers/divisionController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { requireHrRole } from '../middlewares/roleMiddleware.js'
 import { IdParamSchema, type IdParam } from '../schemas/common.js'
 import {
   DivisionQuerySchema,
@@ -34,13 +35,14 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: CreateDivisionBody }>(
     '/',
-    { schema: { body: CreateDivisionBodySchema } },
+    { preHandler: requireHrRole, schema: { body: CreateDivisionBodySchema } },
     divisionController.create
   )
 
   app.put<{ Params: IdParam; Body: UpdateDivisionBody }>(
     '/:id',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: UpdateDivisionBodySchema
@@ -51,7 +53,7 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: IdParam }>(
     '/:id',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     divisionController.remove
   )
 
@@ -59,6 +61,7 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: IdParam; Body: AssignHeadBody }>(
     '/:id/head',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: AssignHeadBodySchema
@@ -70,7 +73,7 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
   // Remove Head of Division
   app.delete<{ Params: IdParam }>(
     '/:id/head',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     divisionController.removeHead
   )
 
@@ -78,6 +81,7 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: IdParam; Body: AssignHeadBody }>(
     '/:id/deputy',
     {
+      preHandler: requireHrRole,
       schema: {
         params: IdParamSchema,
         body: AssignHeadBodySchema
@@ -89,7 +93,7 @@ export async function divisionRoutes(app: FastifyInstance): Promise<void> {
   // Remove Deputy Head
   app.delete<{ Params: IdParam }>(
     '/:id/deputy',
-    { schema: { params: IdParamSchema } },
+    { preHandler: requireHrRole, schema: { params: IdParamSchema } },
     divisionController.removeDeputy
   )
 }
