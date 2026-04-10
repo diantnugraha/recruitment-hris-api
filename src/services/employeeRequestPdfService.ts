@@ -166,15 +166,16 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       const startY = 30
 
       // ============================================
-      // HELPER FUNCTIONS
+      // CONSTANTS & HELPERS
       // ============================================
       const FONT_BOLD = 'Helvetica-Bold'
       const FONT_REGULAR = 'Helvetica'
       const FONT_ITALIC = 'Helvetica-Oblique'
-      // FONT_BOLD_ITALIC available if needed: 'Helvetica-BoldOblique'
 
       const BORDER_COLOR = '#000000'
       const HEADER_BG = '#FFFFFF'
+      const PAD = 4  // cell padding
+      const LABEL_H = 16 // bilingual label height (2 lines of 6.5pt + spacing)
 
       function drawCell(
         x: number, y: number, w: number, h: number,
@@ -235,7 +236,6 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
         doc.save()
         doc.rect(x, y, size, size).lineWidth(0.5).stroke(BORDER_COLOR)
         if (checked) {
-          // Draw checkmark
           doc.moveTo(x + 1.5, y + size / 2)
             .lineTo(x + size / 3, y + size - 2)
             .lineTo(x + size - 1.5, y + 1.5)
@@ -245,19 +245,26 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
         doc.restore()
       }
 
+      /** Measure how tall `text` will be when rendered at `fontSize` within `width`. */
+      function getTextHeight(text: string, width: number, fontSize: number = 7, font: string = FONT_REGULAR): number {
+        doc.save()
+        doc.font(font).fontSize(fontSize)
+        const h = doc.heightOfString(text, { width })
+        doc.restore()
+        return h
+      }
+
       // ============================================
-      // LAYOUT CONSTANTS
+      // LAYOUT
       // ============================================
       const tableX = startX
       let curY = startY
       const fullW = pageWidth
-
-      // Column widths (proportional to the PDF form)
       const col1W = 130  // Labels column
       const col2W = 20   // Number column
 
       // ============================================
-      // 1. HEADER ROW - Logo + Title + Form Info
+      // 1. HEADER ROW — Logo + Title + Form Info
       // ============================================
       const headerH = 40
       const logoColW = 110
@@ -296,44 +303,45 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       // ============================================
       // 2. BASIC INFO ROWS
       // ============================================
-      // Row 1: Jabatan | Division | Jumlah Kebutuhan
-      const row2H = 26
       const basicCol1 = 140
       const basicCol2 = 255
       const basicCol3 = fullW - basicCol1 - basicCol2
 
-      drawCell(tableX, curY, basicCol1, row2H)
-      drawCell(tableX + basicCol1, curY, basicCol2, row2H)
-      drawCell(tableX + basicCol1 + basicCol2, curY, basicCol3, row2H)
+      // Row 1: Jabatan | Divisi | Jumlah Kebutuhan
+      const posValH = getTextHeight(data.position || ' ', basicCol1 - 55 - PAD, 7)
+      const divValH = getTextHeight(data.division || ' ', basicCol2 - 55 - PAD, 7)
+      const row1H = Math.max(30, 3 + LABEL_H + Math.max(posValH, divValH) + PAD)
 
-      drawBilingual('Jabatan', 'Position', tableX + 4, curY + 3, { size: 6.5 })
-      drawDottedLine(tableX + 55, curY + 10, basicCol1 - 60)
-      drawText(data.position, tableX + 55, curY + 4, { size: 7, font: FONT_BOLD })
+      drawCell(tableX, curY, basicCol1, row1H)
+      drawCell(tableX + basicCol1, curY, basicCol2, row1H)
+      drawCell(tableX + basicCol1 + basicCol2, curY, basicCol3, row1H)
 
-      drawBilingual('Divisi', 'Division', tableX + basicCol1 + 4, curY + 3, { size: 6.5 })
-      drawDottedLine(tableX + basicCol1 + 55, curY + 10, basicCol2 - 60)
-      drawText(data.division, tableX + basicCol1 + 55, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Jabatan', 'Position', tableX + PAD, curY + 3, { size: 6.5 })
+      drawText(data.position, tableX + 55, curY + 3 + LABEL_H, { size: 7, width: basicCol1 - 55 - PAD })
 
-      drawBilingual('Jumlah Kebutuhan', 'Number of Required', tableX + basicCol1 + basicCol2 + 4, curY + 3, { size: 6.5 })
-      drawText(String(data.numberOfRequired), tableX + basicCol1 + basicCol2 + basicCol3 - 25, curY + 8, { size: 8, font: FONT_BOLD })
+      drawBilingual('Divisi', 'Division', tableX + basicCol1 + PAD, curY + 3, { size: 6.5 })
+      drawText(data.division, tableX + basicCol1 + 55, curY + 3 + LABEL_H, { size: 7, width: basicCol2 - 55 - PAD })
 
-      curY += row2H
+      drawBilingual('Jumlah Kebutuhan', 'Number of Required', tableX + basicCol1 + basicCol2 + PAD, curY + 3, { size: 6.5 })
+      drawText(String(data.numberOfRequired), tableX + basicCol1 + basicCol2 + PAD, curY + 3 + LABEL_H, { size: 7, width: basicCol3 - PAD * 2 })
+
+      curY += row1H
 
       // Row 2: Tanggal Pengajuan | Tanggal Dibutuhkan | Level Posisi
+      const row2H = 30 // dates and level are short, fixed height is fine
+
       drawCell(tableX, curY, basicCol1, row2H)
       drawCell(tableX + basicCol1, curY, basicCol2, row2H)
       drawCell(tableX + basicCol1 + basicCol2, curY, basicCol3, row2H)
 
-      drawBilingual('Tanggal Pengajuan', 'Requested Date', tableX + 4, curY + 3, { size: 6.5 })
-      drawDottedLine(tableX + 80, curY + 10, basicCol1 - 85)
-      drawText(data.requestedDate, tableX + 80, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Tanggal Pengajuan', 'Requested Date', tableX + PAD, curY + 3, { size: 6.5 })
+      drawText(data.requestedDate, tableX + 80, curY + 3 + LABEL_H, { size: 7, width: basicCol1 - 80 - PAD })
 
-      drawBilingual('Tanggal Dibutuhkan', 'Date Required', tableX + basicCol1 + 4, curY + 3, { size: 6.5 })
-      drawDottedLine(tableX + basicCol1 + 80, curY + 10, basicCol2 - 85)
-      drawText(data.dateRequired, tableX + basicCol1 + 80, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Tanggal Dibutuhkan', 'Date Required', tableX + basicCol1 + PAD, curY + 3, { size: 6.5 })
+      drawText(data.dateRequired, tableX + basicCol1 + 80, curY + 3 + LABEL_H, { size: 7, width: basicCol2 - 80 - PAD })
 
-      drawBilingual('Level Posisi', 'Position Level', tableX + basicCol1 + basicCol2 + 4, curY + 3, { size: 6.5 })
-      drawText(data.positionLevel, tableX + basicCol1 + basicCol2 + 75, curY + 8, { size: 7, font: FONT_BOLD })
+      drawBilingual('Level Posisi', 'Position Level', tableX + basicCol1 + basicCol2 + PAD, curY + 3, { size: 6.5 })
+      drawText(data.positionLevel, tableX + basicCol1 + basicCol2 + PAD, curY + 3 + LABEL_H, { size: 7, width: basicCol3 - PAD * 2 })
 
       curY += row2H
 
@@ -341,37 +349,29 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       // 3. TYPE OF REQUEST ROW
       // ============================================
       const typeRowH = 42
-      const typeCol1 = 100 // Tipe Permohonan label
-      const typeCol2 = 90  // Checkboxes
-      const typeCol3 = 130 // Budget
-      const typeCol4 = fullW - typeCol1 - typeCol2 - typeCol3 // Gender + Checklist
+      const typeCol1 = 100
+      const typeCol2 = 90
+      const typeCol3 = 130
+      const typeCol4 = fullW - typeCol1 - typeCol2 - typeCol3
 
       drawCell(tableX, curY, typeCol1, typeRowH)
       drawCell(tableX + typeCol1, curY, typeCol2, typeRowH)
       drawCell(tableX + typeCol1 + typeCol2, curY, typeCol3, typeRowH)
       drawCell(tableX + typeCol1 + typeCol2 + typeCol3, curY, typeCol4, typeRowH)
 
-      // Tipe Permohonan label
       drawBilingual('Tipe Permohonan', 'Type of Request', tableX + 8, curY + 12, { size: 6.5 })
 
-      // Checkboxes - Additional
       const cbX = tableX + typeCol1 + 10
       drawCheckbox(cbX, curY + 6, data.typeOfRequest === 'new')
       drawBilingual('Penambahan', 'Additional', cbX + 14, curY + 4, { size: 6.5 })
 
-      // Checkboxes - Replacement
       drawCheckbox(cbX, curY + 24, data.typeOfRequest === 'replacement')
       drawBilingual('Penggantian', 'Replacement', cbX + 14, curY + 22, { size: 6.5 })
 
-      // Budget
       const budgetX = tableX + typeCol1 + typeCol2 + 5
-      drawText('Budget : ' + data.budget, budgetX, curY + 8, { size: 6.5 })
-      drawDottedLine(budgetX + 35, curY + 15, typeCol3 - 45)
+      drawText('Budget : ' + data.budget, budgetX, curY + 8, { size: 6.5, width: typeCol3 - 10 })
+      drawText('Sisa Budget : ' + data.remainingBudget, budgetX, curY + 24, { size: 6.5, width: typeCol3 - 10 })
 
-      drawText('Sisa Budget: ' + data.remainingBudget, budgetX, curY + 24, { size: 6.5 })
-      drawDottedLine(budgetX + 52, curY + 31, typeCol3 - 62)
-
-      // Gender + Checklist
       const genderX = tableX + typeCol1 + typeCol2 + typeCol3 + 5
       drawBilingual('Jenis Kelamin', 'Gender', genderX, curY + 2, { size: 6.5 })
 
@@ -379,11 +379,9 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       drawText('<= Centang |', checklistX, curY + 2, { size: 5.5 })
       drawText('Checklist (v)', checklistX + 5, curY + 9, { size: 5.5, font: FONT_ITALIC })
 
-      // Male checkbox
       drawBilingual('Pria', 'Male', genderX, curY + 16, { size: 6.5 })
       drawCheckbox(genderX + 40, curY + 16, data.genderMale)
 
-      // Female checkbox
       drawBilingual('Wanita', 'Female', genderX, curY + 28, { size: 6.5 })
       drawCheckbox(genderX + 40, curY + 28, data.genderFemale)
 
@@ -392,52 +390,53 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       // ============================================
       // 4. REASON + PLACEMENT ROW
       // ============================================
-      const reasonRowH = 36
       const reasonColW = fullW - 130
       const placementColW = 130
+
+      const reasonValH = getTextHeight(data.reason || ' ', reasonColW - PAD * 2, 7)
+      const reasonRowH = Math.max(36, 3 + LABEL_H + reasonValH + PAD)
 
       drawCell(tableX, curY, reasonColW, reasonRowH)
       drawCell(tableX + reasonColW, curY, placementColW, reasonRowH)
 
       drawBilingual('Alasan Permohonan untuk Penambahan atau', 'Reason for this additional or substitution',
-        tableX + 4, curY + 3, { size: 6.5 })
-      // Reason text
-      drawDottedLine(tableX + 4, curY + 22, reasonColW - 10)
-      drawText(data.reason, tableX + 4, curY + 14, { size: 7, width: reasonColW - 10 })
+        tableX + PAD, curY + 3, { size: 6.5 })
+      drawText(data.reason, tableX + PAD, curY + 3 + LABEL_H, { size: 7, width: reasonColW - PAD * 2 })
 
-      // Placement
-      drawBilingual('Penempatan', 'Placement', tableX + reasonColW + 4, curY + 3, { size: 6.5 })
-      drawText(data.placement, tableX + reasonColW + 4, curY + 20, { size: 7, font: FONT_BOLD })
+      drawBilingual('Penempatan', 'Placement', tableX + reasonColW + PAD, curY + 3, { size: 6.5 })
+      drawText(data.placement, tableX + reasonColW + PAD, curY + 3 + LABEL_H, { size: 7, width: placementColW - PAD * 2 })
 
       curY += reasonRowH
 
       // ============================================
-      // 5. JOB DESCRIPTIONS
+      // 5. JOB DESCRIPTIONS (6 rows)
       // ============================================
       const jdLabelW = col1W
       const jdNumW = col2W
       const jdContentW = fullW - jdLabelW - jdNumW
-      const jdRowH = 18
+      const jdMinH = 18
 
-      // 6 rows for job descriptions
       for (let i = 0; i < 6; i++) {
+        const content = data.jobDescriptions[i] || ''
+        const contentH = content ? getTextHeight(content, jdContentW - PAD * 2, 7) : 0
+        const jdRowH = Math.max(jdMinH, contentH + PAD * 2)
+
         drawCell(tableX, curY, jdLabelW, jdRowH)
         drawCell(tableX + jdLabelW, curY, jdNumW, jdRowH)
         drawCell(tableX + jdLabelW + jdNumW, curY, jdContentW, jdRowH)
 
         if (i === 0) {
-          drawBilingual('Uraian Jabatan', 'Job Descriptions', tableX + 4, curY + 3, { size: 6.5 })
+          drawBilingual('Uraian Jabatan', 'Job Descriptions', tableX + PAD, curY + 3, { size: 6.5 })
         }
 
-        drawText(String(i + 1), tableX + jdLabelW + 6, curY + 5, { size: 7, align: 'center', width: jdNumW - 12 })
+        drawText(String(i + 1), tableX + jdLabelW + 6, curY + 5, {
+          size: 7, align: 'center', width: jdNumW - 12
+        })
 
-        if (data.jobDescriptions[i]) {
-          drawDottedLine(tableX + jdLabelW + jdNumW + 4, curY + 12, jdContentW - 10)
-          drawText(data.jobDescriptions[i] ?? '', tableX + jdLabelW + jdNumW + 4, curY + 4, {
-            size: 7, width: jdContentW - 10
+        if (content) {
+          drawText(content, tableX + jdLabelW + jdNumW + PAD, curY + PAD, {
+            size: 7, width: jdContentW - PAD * 2
           })
-        } else {
-          drawDottedLine(tableX + jdLabelW + jdNumW + 4, curY + 12, jdContentW - 10)
         }
 
         curY += jdRowH
@@ -451,146 +450,167 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       const qualLeftContentW = 170
       const qualRightLabelW = 80
       const qualRightContentW = fullW - qualLabelW - qualNumW - qualLeftContentW - qualRightLabelW
-      const qualRowH = 18
+      const qualMinH = 20
+      const fullQualContentW = fullW - qualLabelW - qualNumW
+
+      const qcX = tableX + qualLabelW + qualNumW + PAD
+      const qrX = tableX + qualLabelW + qualNumW + qualLeftContentW + PAD
 
       // Row 1: Usia Minimal | Usia Maksimal
-      drawCell(tableX, curY, qualLabelW, qualRowH)
-      drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW, curY, qualLeftContentW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW, curY, qualRightLabelW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW + qualRightLabelW, curY, qualRightContentW, qualRowH)
+      drawCell(tableX, curY, qualLabelW, qualMinH)
+      drawCell(tableX + qualLabelW, curY, qualNumW, qualMinH)
+      drawCell(tableX + qualLabelW + qualNumW, curY, qualLeftContentW, qualMinH)
+      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW, curY, qualRightLabelW, qualMinH)
+      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW + qualRightLabelW, curY, qualRightContentW, qualMinH)
 
       drawText('1', tableX + qualLabelW + 6, curY + 5, { size: 7, align: 'center', width: qualNumW - 12 })
 
-      const qcX = tableX + qualLabelW + qualNumW + 4
       drawBilingual('Usia Minimal', 'Minimum Age', qcX, curY + 2, { size: 6.5 })
-      drawText(data.minimumAge, qcX + 55, curY + 5, { size: 7, font: FONT_BOLD })
+      drawText(data.minimumAge, qcX + 65, curY + 3, { size: 7, width: qualLeftContentW - 65 - PAD })
 
-      const qrX = tableX + qualLabelW + qualNumW + qualLeftContentW + 4
       drawBilingual('Usia Maksimal', 'Maximum Age', qrX, curY + 2, { size: 6.5 })
-      drawText(data.maximumAge, qrX + qualRightLabelW + 5, curY + 5, { size: 7, font: FONT_BOLD })
+      drawText(data.maximumAge, qrX + 65, curY + 3, { size: 7, width: qualRightContentW - 65 - PAD })
 
-      curY += qualRowH
+      curY += qualMinH
 
       // Row 2: Pendidikan | Jurusan
-      drawCell(tableX, curY, qualLabelW, qualRowH)
-      drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW, curY, qualLeftContentW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW, curY, qualRightLabelW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW + qualRightLabelW, curY, qualRightContentW, qualRowH)
+      drawCell(tableX, curY, qualLabelW, qualMinH)
+      drawCell(tableX + qualLabelW, curY, qualNumW, qualMinH)
+      drawCell(tableX + qualLabelW + qualNumW, curY, qualLeftContentW, qualMinH)
+      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW, curY, qualRightLabelW, qualMinH)
+      drawCell(tableX + qualLabelW + qualNumW + qualLeftContentW + qualRightLabelW, curY, qualRightContentW, qualMinH)
 
       drawText('2', tableX + qualLabelW + 6, curY + 5, { size: 7, align: 'center', width: qualNumW - 12 })
 
       drawBilingual('Pendidikan', 'Educational', qcX, curY + 2, { size: 6.5 })
-      drawText(data.educational, qcX + 55, curY + 5, { size: 7, font: FONT_BOLD })
+      drawText(data.educational, qcX + 60, curY + 3, { size: 7, width: qualLeftContentW - 60 - PAD })
 
       drawBilingual('Jurusan', 'Majors', qrX, curY + 2, { size: 6.5 })
-      drawText(data.majors, qrX + qualRightLabelW + 5, curY + 5, { size: 7, font: FONT_BOLD })
+      drawText(data.majors, qrX + 45, curY + 3, { size: 7, width: qualRightContentW - 10 })
 
-      curY += qualRowH
+      curY += qualMinH
 
       // Row 3: Pengalaman
-      const fullQualContentW = fullW - qualLabelW - qualNumW
-      drawCell(tableX, curY, qualLabelW, qualRowH)
-      drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, qualRowH)
+      const expH = getTextHeight(data.experience || ' ', fullQualContentW - 65, 7)
+      const expRowH = Math.max(qualMinH, Math.max(expH, LABEL_H) + PAD * 2)
 
-      drawBilingual('Kualifikasi Jabatan', 'Job Qualification', tableX + 4, curY + 3, { size: 6.5 })
+      drawCell(tableX, curY, qualLabelW, expRowH)
+      drawCell(tableX + qualLabelW, curY, qualNumW, expRowH)
+      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, expRowH)
+
+      drawBilingual('Kualifikasi Jabatan', 'Job Qualification', tableX + PAD, curY + 3, { size: 6.5 })
       drawText('3', tableX + qualLabelW + 6, curY + 5, { size: 7, align: 'center', width: qualNumW - 12 })
       drawBilingual('Pengalaman', 'Experience', qcX, curY + 2, { size: 6.5 })
-      drawText(data.experience, qcX + 55, curY + 5, { size: 7, font: FONT_BOLD })
+      drawText(data.experience, qcX + 60, curY + 3, { size: 7, width: fullQualContentW - 65 })
 
-      curY += qualRowH
+      curY += expRowH
 
       // Rows 4-8: Kompetensi Khusus - Mandatory
       for (let i = 0; i < 5; i++) {
         const rowNum = i + 4
-        drawCell(tableX, curY, qualLabelW, qualRowH)
-        drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-        drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, qualRowH)
+        const content = data.mandatoryCompetencies[i] || ''
+        const contentH = content ? getTextHeight(content, fullQualContentW - PAD * 2, 7) : 0
+        const hasLabel = i === 1
+        const minH = hasLabel ? Math.max(qualMinH, LABEL_H + PAD * 2) : qualMinH
+        const rowH = hasLabel
+          ? Math.max(minH, LABEL_H + PAD + contentH + PAD)
+          : Math.max(minH, contentH + PAD * 2)
 
-        drawText(String(rowNum), tableX + qualLabelW + 6, curY + 5, { size: 7, align: 'center', width: qualNumW - 12 })
+        drawCell(tableX, curY, qualLabelW, rowH)
+        drawCell(tableX + qualLabelW, curY, qualNumW, rowH)
+        drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, rowH)
 
-        // Label on row 5 (middle of 4-8 range)
-        if (i === 1) {
+        drawText(String(rowNum), tableX + qualLabelW + 6, curY + 5, {
+          size: 7, align: 'center', width: qualNumW - 12
+        })
+
+        if (hasLabel) {
           drawBilingual('Kompetensi Khusus', 'Mandatory', qcX, curY + 2, { size: 6.5, font: FONT_BOLD })
         }
 
-        if (data.mandatoryCompetencies[i]) {
-          drawDottedLine(qcX, curY + 12, fullQualContentW - 10)
-          drawText(data.mandatoryCompetencies[i] ?? '', qcX, curY + 4, { size: 7, width: fullQualContentW - 10 })
-        } else {
-          drawDottedLine(qcX, curY + 12, fullQualContentW - 10)
+        if (content) {
+          const textY = hasLabel ? curY + LABEL_H + PAD : curY + PAD
+          drawText(content, qcX, textY, { size: 7, width: fullQualContentW - PAD * 2 })
         }
 
-        curY += qualRowH
+        curY += rowH
       }
 
       // Row 9: Kompetensi Khusus - Specialist
-      drawCell(tableX, curY, qualLabelW, qualRowH)
-      drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, qualRowH)
+      const spec0 = data.specialistCompetencies[0] || ''
+      const spec0H = spec0 ? getTextHeight(spec0, fullQualContentW - PAD * 2, 7) : 0
+      const row9H = Math.max(qualMinH, LABEL_H + PAD + spec0H + PAD)
+
+      drawCell(tableX, curY, qualLabelW, row9H)
+      drawCell(tableX + qualLabelW, curY, qualNumW, row9H)
+      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, row9H)
 
       drawText('9', tableX + qualLabelW + 6, curY + 5, { size: 7, align: 'center', width: qualNumW - 12 })
       drawBilingual('Kompetensi Khusus', 'Specialist', qcX, curY + 2, { size: 6.5, font: FONT_BOLD })
 
-      if (data.specialistCompetencies[0]) {
-        drawText(data.specialistCompetencies[0] ?? '', qcX + 80, curY + 4, { size: 7, width: fullQualContentW - 90 })
+      if (spec0) {
+        drawText(spec0, qcX, curY + LABEL_H + PAD, { size: 7, width: fullQualContentW - PAD * 2 })
       }
-      drawDottedLine(qcX + 80, curY + 12, fullQualContentW - 90)
 
-      curY += qualRowH
+      curY += row9H
 
-      // Rows 10-11: More specialist/transition
+      // Rows 10-11: Specialist continued
       for (let i = 0; i < 2; i++) {
         const rowNum = i + 10
-        drawCell(tableX, curY, qualLabelW, qualRowH)
-        drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-        drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, qualRowH)
-
-        drawText(String(rowNum), tableX + qualLabelW + 6, curY + 5, { size: 7, align: 'center', width: qualNumW - 12 })
-
         const specIdx = i + 1
-        if (data.specialistCompetencies[specIdx]) {
-          drawDottedLine(qcX, curY + 12, fullQualContentW - 10)
-          drawText(data.specialistCompetencies[specIdx] ?? '', qcX, curY + 4, { size: 7, width: fullQualContentW - 10 })
-        } else {
-          drawDottedLine(qcX, curY + 12, fullQualContentW - 10)
+        const content = data.specialistCompetencies[specIdx] || ''
+        const contentH = content ? getTextHeight(content, fullQualContentW - PAD * 2, 7) : 0
+        const rowH = Math.max(qualMinH, contentH + PAD * 2)
+
+        drawCell(tableX, curY, qualLabelW, rowH)
+        drawCell(tableX + qualLabelW, curY, qualNumW, rowH)
+        drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, rowH)
+
+        drawText(String(rowNum), tableX + qualLabelW + 6, curY + 5, {
+          size: 7, align: 'center', width: qualNumW - 12
+        })
+
+        if (content) {
+          drawText(content, qcX, curY + PAD, { size: 7, width: fullQualContentW - PAD * 2 })
         }
 
-        curY += qualRowH
+        curY += rowH
       }
 
       // Row 12: Kompetensi Penunjang - Optional
-      drawCell(tableX, curY, qualLabelW, qualRowH)
-      drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, qualRowH)
+      const opt0 = data.optionalCompetencies[0] || ''
+      const opt0H = opt0 ? getTextHeight(opt0, fullQualContentW - PAD * 2, 7) : 0
+      const row12H = Math.max(qualMinH, LABEL_H + PAD + opt0H + PAD)
+
+      drawCell(tableX, curY, qualLabelW, row12H)
+      drawCell(tableX + qualLabelW, curY, qualNumW, row12H)
+      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, row12H)
 
       drawText('12', tableX + qualLabelW + 4, curY + 5, { size: 7, align: 'center', width: qualNumW - 8 })
       drawBilingual('Kompetensi Penunjang', 'Optional', qcX, curY + 2, { size: 6.5, font: FONT_BOLD })
 
-      if (data.optionalCompetencies[0]) {
-        drawText(data.optionalCompetencies[0] ?? '', qcX + 80, curY + 4, { size: 7, width: fullQualContentW - 90 })
+      if (opt0) {
+        drawText(opt0, qcX, curY + LABEL_H + PAD, { size: 7, width: fullQualContentW - PAD * 2 })
       }
-      drawDottedLine(qcX + 80, curY + 12, fullQualContentW - 90)
 
-      curY += qualRowH
+      curY += row12H
 
       // Row 13: Optional continued
-      drawCell(tableX, curY, qualLabelW, qualRowH)
-      drawCell(tableX + qualLabelW, curY, qualNumW, qualRowH)
-      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, qualRowH)
+      const opt1 = data.optionalCompetencies[1] || ''
+      const opt1H = opt1 ? getTextHeight(opt1, fullQualContentW - PAD * 2, 7) : 0
+      const row13H = Math.max(qualMinH, opt1H + PAD * 2)
+
+      drawCell(tableX, curY, qualLabelW, row13H)
+      drawCell(tableX + qualLabelW, curY, qualNumW, row13H)
+      drawCell(tableX + qualLabelW + qualNumW, curY, fullQualContentW, row13H)
 
       drawText('13', tableX + qualLabelW + 4, curY + 5, { size: 7, align: 'center', width: qualNumW - 8 })
 
-      if (data.optionalCompetencies[1]) {
-        drawDottedLine(qcX, curY + 12, fullQualContentW - 10)
-        drawText(data.optionalCompetencies[1] ?? '', qcX, curY + 4, { size: 7, width: fullQualContentW - 10 })
-      } else {
-        drawDottedLine(qcX, curY + 12, fullQualContentW - 10)
+      if (opt1) {
+        drawText(opt1, qcX, curY + PAD, { size: 7, width: fullQualContentW - PAD * 2 })
       }
 
-      curY += qualRowH
+      curY += row13H
 
       // ============================================
       // 7. SIGNATURE SECTION
@@ -605,14 +625,10 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       drawCell(tableX + sigColW * 2, curY, sigColW, sigRowH)
       drawCell(tableX + sigColW * 3, curY, sigColW, sigRowH)
 
-      // Dibuat Oleh | Created By
-      drawBilingual('Dibuat Oleh', 'Created By', tableX + 4, curY + 4, { size: 7, font: FONT_BOLD })
-      // Diketahui Oleh | Acknowledge By
-      drawBilingual('Diketahui Oleh', 'Acknowledge By', tableX + sigColW + 4, curY + 4, { size: 7, font: FONT_BOLD })
-      // Diperiksa Oleh | Checked By
-      drawBilingual('Diperiksa Oleh', 'Checked By', tableX + sigColW * 2 + 4, curY + 4, { size: 7, font: FONT_BOLD })
-      // Disetujui Oleh | Approved By
-      drawBilingual('Disetujui Oleh', 'Approved By', tableX + sigColW * 3 + 4, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Dibuat Oleh', 'Created By', tableX + PAD, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Diketahui Oleh', 'Acknowledge By', tableX + sigColW + PAD, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Diperiksa Oleh', 'Checked By', tableX + sigColW * 2 + PAD, curY + 4, { size: 7, font: FONT_BOLD })
+      drawBilingual('Disetujui Oleh', 'Approved By', tableX + sigColW * 3 + PAD, curY + 4, { size: 7, font: FONT_BOLD })
 
       curY += sigRowH
 
@@ -622,7 +638,7 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       drawCell(tableX + sigColW * 2, curY, sigColW, sigBoxH)
       drawCell(tableX + sigColW * 3, curY, sigColW, sigBoxH)
 
-      // Names with dotted lines
+      // Names with dotted underlines (kept for signatures)
       const sigNameY = curY + sigBoxH - 22
       drawDottedLine(tableX + 10, sigNameY + 8, sigColW - 20)
       drawText(data.createdByName, tableX + 10, sigNameY, { size: 7, width: sigColW - 20, align: 'center' })
@@ -645,10 +661,10 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       drawCell(tableX + sigColW * 2, curY, sigColW, roleH)
       drawCell(tableX + sigColW * 3, curY, sigColW, roleH)
 
-      drawText('Department', tableX + 4, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - 8, align: 'center' })
-      drawText('Head of Division', tableX + sigColW + 4, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - 8, align: 'center' })
-      drawText('Human Capital Division', tableX + sigColW * 2 + 4, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - 8, align: 'center' })
-      drawText('President Director', tableX + sigColW * 3 + 4, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - 8, align: 'center' })
+      drawText('Department', tableX + PAD, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - PAD * 2, align: 'center' })
+      drawText('Head of Division', tableX + sigColW + PAD, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - PAD * 2, align: 'center' })
+      drawText('Human Capital Division', tableX + sigColW * 2 + PAD, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - PAD * 2, align: 'center' })
+      drawText('President Director', tableX + sigColW * 3 + PAD, curY + 4, { size: 7, font: FONT_BOLD, width: sigColW - PAD * 2, align: 'center' })
 
       // Finalize
       doc.end()
