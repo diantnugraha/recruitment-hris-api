@@ -61,34 +61,84 @@ export interface EmployeeRequestPdfData {
   approvedByName: string      // President Director
 }
 
+// Strip HTML tags from a string
+function stripHtmlTags(str: string): string {
+  return str.replace(/<[^>]+>/g, '').trim()
+}
+
+// Lexical node type for recursive traversal
+interface LexicalNode {
+  type?: string
+  text?: string
+  listType?: string
+  tag?: string
+  children?: LexicalNode[]
+}
+
+// Collect all text content from a single node's subtree into one string
+function collectNodeText(node: LexicalNode): string {
+  if (node.type === 'text' && node.text) {
+    return node.text
+  }
+  if (node.type === 'linebreak') {
+    return '\n'
+  }
+  if (node.children && Array.isArray(node.children)) {
+    return node.children.map(collectNodeText).join('')
+  }
+  return ''
+}
+
+// Walk the Lexical tree, grouping text by paragraph or list-item
+function processLexicalNode(node: LexicalNode, items: string[]): void {
+  if (!node) return
+
+  // Each listitem becomes one entry
+  if (node.type === 'list') {
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        if (child.type === 'listitem') {
+          const text = collectNodeText(child).trim()
+          if (text) items.push(text)
+        }
+      }
+    }
+    return
+  }
+
+  // Each paragraph becomes one entry
+  if (node.type === 'paragraph') {
+    const text = collectNodeText(node).trim()
+    if (text) items.push(text)
+    return
+  }
+
+  // For root and other container nodes, recurse
+  if (node.children && Array.isArray(node.children)) {
+    for (const child of node.children) {
+      processLexicalNode(child, items)
+    }
+  }
+}
+
 // Lexical JSON to plain text extractor
 function extractTextFromLexical(content: string | null | undefined): string[] {
   if (!content) return []
 
   try {
     const parsed = JSON.parse(content)
-    const lines: string[] = []
-
-    function extractFromNode(node: { type?: string; text?: string; children?: Array<{ type?: string; text?: string; children?: unknown[] }> }): void {
-      if (node.type === 'text' && node.text) {
-        lines.push(node.text)
-      }
-      if (node.children && Array.isArray(node.children)) {
-        for (const child of node.children) {
-          extractFromNode(child as { type?: string; text?: string; children?: Array<{ type?: string; text?: string; children?: unknown[] }> })
-        }
-      }
-    }
+    const items: string[] = []
 
     if (parsed.root) {
-      extractFromNode(parsed.root)
+      processLexicalNode(parsed.root, items)
     }
 
-    return lines.filter(l => l.trim() !== '')
+    return items.filter(l => l.trim() !== '')
   } catch {
-    // If not JSON, treat as plain text
-    if (content.trim()) {
-      return content.split('\n').filter(l => l.trim() !== '')
+    // Not valid JSON — strip HTML tags and split by newline
+    const cleaned = stripHtmlTags(content)
+    if (cleaned) {
+      return cleaned.split('\n').filter(l => l.trim() !== '')
     }
     return []
   }
@@ -223,7 +273,7 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
         const logoPath = getLogoPath()
         doc.image(logoPath, tableX + 8, curY + 8, { width: 90, height: 24 })
       } catch {
-        drawText('TUV NORD', tableX + 10, curY + 14, { font: FONT_BOLD, size: 12 })
+        drawText('TÜV NORD', tableX + 10, curY + 14, { font: FONT_BOLD, size: 12 })
       }
 
       // Title
