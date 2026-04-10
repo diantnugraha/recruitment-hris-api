@@ -310,38 +310,38 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       // Row 1: Jabatan | Divisi | Jumlah Kebutuhan
       const posValH = getTextHeight(data.position || ' ', basicCol1 - 55 - PAD, 7)
       const divValH = getTextHeight(data.division || ' ', basicCol2 - 55 - PAD, 7)
-      const row1H = Math.max(30, 3 + LABEL_H + Math.max(posValH, divValH) + PAD)
+      const row1H = Math.max(26, Math.max(LABEL_H, posValH, divValH) + 3 + PAD)
 
       drawCell(tableX, curY, basicCol1, row1H)
       drawCell(tableX + basicCol1, curY, basicCol2, row1H)
       drawCell(tableX + basicCol1 + basicCol2, curY, basicCol3, row1H)
 
       drawBilingual('Jabatan', 'Position', tableX + PAD, curY + 3, { size: 6.5 })
-      drawText(data.position, tableX + 55, curY + 3 + LABEL_H, { size: 7, width: basicCol1 - 55 - PAD })
+      drawText(data.position, tableX + 55, curY + 4, { size: 7, width: basicCol1 - 55 - PAD })
 
       drawBilingual('Divisi', 'Division', tableX + basicCol1 + PAD, curY + 3, { size: 6.5 })
-      drawText(data.division, tableX + basicCol1 + 55, curY + 3 + LABEL_H, { size: 7, width: basicCol2 - 55 - PAD })
+      drawText(data.division, tableX + basicCol1 + 55, curY + 4, { size: 7, width: basicCol2 - 55 - PAD })
 
       drawBilingual('Jumlah Kebutuhan', 'Number of Required', tableX + basicCol1 + basicCol2 + PAD, curY + 3, { size: 6.5 })
-      drawText(String(data.numberOfRequired), tableX + basicCol1 + basicCol2 + PAD, curY + 3 + LABEL_H, { size: 7, width: basicCol3 - PAD * 2 })
+      drawText(String(data.numberOfRequired), tableX + basicCol1 + basicCol2 + basicCol3 - 25, curY + 8, { size: 8, width: 20 })
 
       curY += row1H
 
       // Row 2: Tanggal Pengajuan | Tanggal Dibutuhkan | Level Posisi
-      const row2H = 30 // dates and level are short, fixed height is fine
+      const row2H = 26
 
       drawCell(tableX, curY, basicCol1, row2H)
       drawCell(tableX + basicCol1, curY, basicCol2, row2H)
       drawCell(tableX + basicCol1 + basicCol2, curY, basicCol3, row2H)
 
       drawBilingual('Tanggal Pengajuan', 'Requested Date', tableX + PAD, curY + 3, { size: 6.5 })
-      drawText(data.requestedDate, tableX + 80, curY + 3 + LABEL_H, { size: 7, width: basicCol1 - 80 - PAD })
+      drawText(data.requestedDate, tableX + 80, curY + 4, { size: 7, width: basicCol1 - 80 - PAD })
 
       drawBilingual('Tanggal Dibutuhkan', 'Date Required', tableX + basicCol1 + PAD, curY + 3, { size: 6.5 })
-      drawText(data.dateRequired, tableX + basicCol1 + 80, curY + 3 + LABEL_H, { size: 7, width: basicCol2 - 80 - PAD })
+      drawText(data.dateRequired, tableX + basicCol1 + 80, curY + 4, { size: 7, width: basicCol2 - 80 - PAD })
 
       drawBilingual('Level Posisi', 'Position Level', tableX + basicCol1 + basicCol2 + PAD, curY + 3, { size: 6.5 })
-      drawText(data.positionLevel, tableX + basicCol1 + basicCol2 + PAD, curY + 3 + LABEL_H, { size: 7, width: basicCol3 - PAD * 2 })
+      drawText(data.positionLevel, tableX + basicCol1 + basicCol2 + 75, curY + 8, { size: 7, width: basicCol3 - 75 - PAD })
 
       curY += row2H
 
@@ -393,18 +393,20 @@ export function generateEmployeeRequestPdf(data: EmployeeRequestPdfData): Promis
       const reasonColW = fullW - 130
       const placementColW = 130
 
+      // Reason value goes below label (label is 2 lines long), placement value inline
       const reasonValH = getTextHeight(data.reason || ' ', reasonColW - PAD * 2, 7)
-      const reasonRowH = Math.max(36, 3 + LABEL_H + reasonValH + PAD)
+      const reasonRowH = Math.max(36, LABEL_H + 4 + reasonValH + PAD)
 
       drawCell(tableX, curY, reasonColW, reasonRowH)
       drawCell(tableX + reasonColW, curY, placementColW, reasonRowH)
 
       drawBilingual('Alasan Permohonan untuk Penambahan atau', 'Reason for this additional or substitution',
         tableX + PAD, curY + 3, { size: 6.5 })
-      drawText(data.reason, tableX + PAD, curY + 3 + LABEL_H, { size: 7, width: reasonColW - PAD * 2 })
+      // Reason label is very long, so value goes below it
+      drawText(data.reason, tableX + PAD, curY + 3 + LABEL_H + 2, { size: 7, width: reasonColW - PAD * 2 })
 
       drawBilingual('Penempatan', 'Placement', tableX + reasonColW + PAD, curY + 3, { size: 6.5 })
-      drawText(data.placement, tableX + reasonColW + PAD, curY + 3 + LABEL_H, { size: 7, width: placementColW - PAD * 2 })
+      drawText(data.placement, tableX + reasonColW + PAD, curY + 3 + LABEL_H + 2, { size: 7, width: placementColW - PAD * 2 })
 
       curY += reasonRowH
 
