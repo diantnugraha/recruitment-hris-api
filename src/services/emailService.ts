@@ -445,17 +445,18 @@ export type InterviewScheduleEmailData = {
 }
 
 function getInterviewScheduleTemplate(data: InterviewScheduleEmailData & { companyName: string }): string {
-  const formattedDate = new Date(data.interviewDate).toLocaleDateString('id-ID', {
+  const formattedDate = new Date(data.interviewDate).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
     timeZone: 'Asia/Jakarta',
   })
 
-  const typeLabel = data.interviewType === 'online' ? 'Online (Virtual)' : 'Onsite (Tatap Muka)'
+  const typeLabel = data.interviewType === 'online' ? 'Online (Virtual)' : 'Onsite'
 
   const bodyHtml = `
     <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
@@ -684,13 +685,14 @@ export type McuScheduleEmailData = {
 }
 
 function getMcuScheduleTemplate(data: McuScheduleEmailData & { companyName: string }): string {
-  const formattedDate = new Date(data.mcuDate).toLocaleDateString('id-ID', {
+  const formattedDate = new Date(data.mcuDate).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
     timeZone: 'Asia/Jakarta',
   })
 
@@ -1006,18 +1008,18 @@ function getFacilityPicTemplate(data: FacilityPicEmailData & { companyName: stri
 
   const bodyHtml = `
     <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
-      Akan ada karyawan baru yang bergabung. Mohon disiapkan fasilitas berikut:
+      A new employee will be joining the team. Please prepare the following facilities:
     </p>
 
     <!-- Candidate Details Card -->
     <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
       <tr>
         <td style="padding: 20px;">
-          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Nama Karyawan</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Employee Name</p>
           <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.candidateName}</p>
-          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Tanggal Bergabung</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Join Date</p>
           <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.joinDate}</p>
-          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Lokasi Kerja</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Work Location</p>
           <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.workLocation}</p>
         </td>
       </tr>
@@ -1029,7 +1031,7 @@ function getFacilityPicTemplate(data: FacilityPicEmailData & { companyName: stri
         <tr>
           <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 6px 0 0 0;">Item</th>
           <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: center;">Qty</th>
-          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 0 6px 0 0;">Kondisi</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 0 6px 0 0;">Condition</th>
         </tr>
       </thead>
       <tbody>
@@ -1038,14 +1040,14 @@ function getFacilityPicTemplate(data: FacilityPicEmailData & { companyName: stri
     </table>
 
     <p style="margin: 16px 0 0 0; color: #333333; font-size: 15px; line-height: 1.6;">
-      Terima kasih.
+      Thank you.
     </p>
   `
 
   return getBaseLayout({
-    title: `Persiapan Fasilitas Karyawan Baru - ${data.candidateName}`,
-    heading: 'Persiapan Fasilitas Karyawan Baru',
-    greeting: `Yth. ${data.picName},`,
+    title: `New Employee Facility Preparation - ${data.candidateName}`,
+    heading: 'New Employee Facility Preparation',
+    greeting: `Dear ${data.picName},`,
     bodyHtml,
   })
 }
@@ -1062,7 +1064,7 @@ export async function sendFacilityPicEmail(data: FacilityPicEmailData): Promise<
   await mg.messages.create(config.domain, {
     from: `${config.fromName} <${config.from}>`,
     to: data.picEmail,
-    subject: `Persiapan Fasilitas Karyawan Baru - ${data.candidateName}`,
+    subject: `New Employee Facility Preparation - ${data.candidateName}`,
     html,
   })
 
@@ -1093,16 +1095,16 @@ function getProgramPicTemplate(data: ProgramPicEmailData & { companyName: string
 
   const bodyHtml = `
     <p style="margin: 0 0 16px 0; color: #333333; font-size: 15px; line-height: 1.6;">
-      Akan ada karyawan baru yang bergabung. Mohon disiapkan program onboarding berikut:
+      A new employee will be joining the team. Please prepare the following onboarding programs:
     </p>
 
     <!-- Candidate Details Card -->
     <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #f7f7f7; border-radius: 8px; border-left: 4px solid #0032A0;">
       <tr>
         <td style="padding: 20px;">
-          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Nama Karyawan</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Employee Name</p>
           <p style="margin: 0 0 14px 0; color: #1a1a1a; font-size: 17px; font-weight: 700;">${data.candidateName}</p>
-          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Tanggal Bergabung</p>
+          <p style="margin: 0 0 4px 0; color: #888888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Join Date</p>
           <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 500;">${data.joinDate}</p>
         </td>
       </tr>
@@ -1113,8 +1115,8 @@ function getProgramPicTemplate(data: ProgramPicEmailData & { companyName: string
       <thead>
         <tr>
           <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 6px 0 0 0;">Program</th>
-          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left;">Tanggal</th>
-          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 0 6px 0 0;">Lokasi</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left;">Date</th>
+          <th style="padding: 10px 12px; background-color: #0032A0; color: #ffffff; font-size: 13px; font-weight: 600; text-align: left; border-radius: 0 6px 0 0;">Location</th>
         </tr>
       </thead>
       <tbody>
@@ -1123,14 +1125,14 @@ function getProgramPicTemplate(data: ProgramPicEmailData & { companyName: string
     </table>
 
     <p style="margin: 16px 0 0 0; color: #333333; font-size: 15px; line-height: 1.6;">
-      Terima kasih.
+      Thank you.
     </p>
   `
 
   return getBaseLayout({
-    title: `Persiapan Program Onboarding - ${data.candidateName}`,
-    heading: 'Persiapan Program Onboarding',
-    greeting: `Yth. ${data.picName},`,
+    title: `Onboarding Program Preparation - ${data.candidateName}`,
+    heading: 'Onboarding Program Preparation',
+    greeting: `Dear ${data.picName},`,
     bodyHtml,
   })
 }
@@ -1147,7 +1149,7 @@ export async function sendProgramPicEmail(data: ProgramPicEmailData): Promise<vo
   await mg.messages.create(config.domain, {
     from: `${config.fromName} <${config.from}>`,
     to: data.picEmail,
-    subject: `Persiapan Program Onboarding - ${data.candidateName}`,
+    subject: `Onboarding Program Preparation - ${data.candidateName}`,
     html,
   })
 

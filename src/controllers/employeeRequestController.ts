@@ -103,10 +103,11 @@ export async function getAll(
   request: FastifyRequest<{ Querystring: EmployeeRequestQuery }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { page = 1, limit = 20, status, job_title_id, requested_by_id, search } = request.query
+  const { page = 1, limit = 20, status, department_id, job_title_id, requested_by_id, search } = request.query
 
   const filters = {
     ...(status && { status }),
+    ...(department_id && { departmentId: department_id }),
     ...(job_title_id && { jobTitleId: job_title_id }),
     ...(requested_by_id && { requestedById: requested_by_id }),
     ...(search && { search })
@@ -163,6 +164,7 @@ export async function create(
     ...(body.job_placement !== undefined && { jobPlacement: body.job_placement }),
     ...(body.budget !== undefined && { budget: body.budget }),
     ...(body.expected_onboard_date !== undefined && { expectedOnboardDate: new Date(body.expected_onboard_date) }),
+    ...(body.department_id !== undefined && { departmentId: body.department_id }),
     status: body.status || 'draft',
     createdBy: user.userId
   }
@@ -298,9 +300,12 @@ export async function generatePdf(
   const pdfData = await buildPdfData(employeeRequest)
   const pdfBuffer = await generateEmployeeRequestPdf(pdfData)
 
+  const nameParts = [employeeRequest.code, employeeRequest.jobTitle?.name].filter(Boolean)
+  const filename = nameParts.join(' - ') + '.pdf'
+
   reply
     .header('Content-Type', 'application/pdf')
-    .header('Content-Disposition', `inline; filename="Employee-Request-${employeeRequest.code}.pdf"`)
+    .header('Content-Disposition', `inline; filename="${filename}"`)
     .send(pdfBuffer)
 }
 
@@ -386,7 +391,7 @@ async function buildPdfData(er: EmployeeRequestWithRelations): Promise<EmployeeR
     genderFemale: genderString === 'female' || genderString === 'any',
     reason: er.reason || er.generalJobPurpose || '',
     placement: er.jobPlacement || '',
-    jobDescriptions: jobDescLines.slice(0, 6),
+    jobDescriptions: jobDescLines.slice(0, 7),
     minimumAge: er.ageFrom ? String(er.ageFrom) : '',
     maximumAge: er.ageTo ? String(er.ageTo) : '',
     educational: er.education || '',

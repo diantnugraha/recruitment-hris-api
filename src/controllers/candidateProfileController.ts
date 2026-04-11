@@ -8,8 +8,9 @@ import type {
 } from '@prisma/client'
 
 import * as candidateProfileService from '../services/candidateProfileService.js'
+import * as employeeRepository from '../repositories/employeeRepository.js'
 import { successResponse } from '../utils/response.js'
-import { UnauthorizedError } from '../errors/index.js'
+import { UnauthorizedError, AppError } from '../errors/index.js'
 import type {
   EducationalBackgroundInput,
   WorkExperienceInput,
@@ -396,6 +397,24 @@ export async function getOnboarding(
     return reply.status(200).send(successResponse(null))
   }
 
+  // Resolve PIC employee names so frontend can display them as a string
+  const programPicEmployeeIds = Array.from(
+    new Set(
+      (onboarding.programs ?? [])
+        .flatMap(program => program.pics ?? [])
+        .map(pic => pic.employee_id)
+    )
+  )
+
+  const employeeNamesResult = await employeeRepository.findNamesByIds(programPicEmployeeIds)
+  if (employeeNamesResult.isFailure()) {
+    throw new AppError(500, employeeNamesResult.error)
+  }
+
+  const employeeNameById = new Map<number, string>(
+    employeeNamesResult.getValue().map(employee => [employee.employeeId, employee.employeeName ?? ''])
+  )
+
   return reply.status(200).send(
     successResponse({
       id: Number(onboarding.id),
@@ -422,6 +441,7 @@ export async function getOnboarding(
         program: p.program,
         date: p.date,
         location: p.location,
+        pic: resolvePicString(p.pics ?? [], p.pic_legacy, employeeNameById),
         pic_legacy: p.pic_legacy,
         status: p.status,
         pics: (p.pics || []).map(pic => ({
@@ -430,8 +450,21 @@ export async function getOnboarding(
         }))
       })),
       onboarding_accepted_at: onboarding.onboardingAcceptedAt?.toISOString() || null,
+      onboarding_sent_at: onboarding.onboardingSentAt?.toISOString() || null,
       created_at: onboarding.createdAt?.toISOString() || null,
       updated_at: onboarding.updatedAt?.toISOString() || null
     })
   )
+}
+
+function resolvePicString(
+  pics: { employee_id: number }[],
+  legacy: string,
+  employeeNameById: Map<number, string>
+): string {
+  const names = pics
+    .map(pic => employeeNameById.get(pic.employee_id) ?? '')
+    .filter(name => name.length > 0)
+
+  return names.length > 0 ? names.join(', ') : (legacy ?? '')
 }

@@ -313,6 +313,7 @@ export async function candidateProfileRoutes(app: FastifyInstance): Promise<void
               job_placement: Type.String(),
               document: Type.String(),
               document_candidate: Type.String(),
+              join_date: Type.Union([Type.String(), Type.Null()]),
               facilities: Type.Array(Type.Object({
                 id: Type.Number(),
                 inventory_no: Type.String(),
@@ -320,7 +321,11 @@ export async function candidateProfileRoutes(app: FastifyInstance): Promise<void
                 qty: Type.Number(),
                 unit: Type.String(),
                 condition: Type.String(),
-                status: Type.String()
+                status: Type.String(),
+                pics: Type.Array(Type.Object({
+                  id: Type.Number(),
+                  employee_id: Type.Number()
+                }))
               })),
               programs: Type.Array(Type.Object({
                 id: Type.Number(),
@@ -328,9 +333,15 @@ export async function candidateProfileRoutes(app: FastifyInstance): Promise<void
                 date: Type.String(),
                 location: Type.String(),
                 pic: Type.String(),
-                status: Type.String()
+                pic_legacy: Type.String(),
+                status: Type.String(),
+                pics: Type.Array(Type.Object({
+                  id: Type.Number(),
+                  employee_id: Type.Number()
+                }))
               })),
               onboarding_accepted_at: Type.Union([Type.String(), Type.Null()]),
+              onboarding_sent_at: Type.Union([Type.String(), Type.Null()]),
               created_at: Type.Union([Type.String(), Type.Null()]),
               updated_at: Type.Union([Type.String(), Type.Null()])
             }),

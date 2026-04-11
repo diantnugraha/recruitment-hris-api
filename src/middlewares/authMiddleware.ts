@@ -28,18 +28,19 @@ export async function authenticate(
   _reply: FastifyReply
 ): Promise<void> {
   const authHeader = request.headers.authorization
+  const cookieToken = request.cookies?.auth_token
 
-  if (!authHeader) {
-    throw new UnauthorizedError('No token provided')
+  let token: string | undefined
+
+  if (authHeader) {
+    const parts = authHeader.split(' ')
+    if (parts.length !== 2 || parts[0] !== AUTH_CONSTANTS.TOKEN_PREFIX) {
+      throw new UnauthorizedError('Invalid token format')
+    }
+    token = parts[1]
+  } else if (cookieToken) {
+    token = cookieToken
   }
-
-  const parts = authHeader.split(' ')
-
-  if (parts.length !== 2 || parts[0] !== AUTH_CONSTANTS.TOKEN_PREFIX) {
-    throw new UnauthorizedError('Invalid token format')
-  }
-
-  const token = parts[1]
 
   if (!token) {
     throw new UnauthorizedError('No token provided')

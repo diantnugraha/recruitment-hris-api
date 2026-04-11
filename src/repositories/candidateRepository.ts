@@ -23,6 +23,7 @@ export type CandidateWithDetail = CandidateRecruitment & {
   assessment?: candidate_recruitment_assessment | null | undefined
   onboarding?: {
     onboardingAcceptedAt: Date | null
+    onboardingSentAt: Date | null
   } | null | undefined
   jobTitle?: {
     id: bigint
@@ -310,7 +311,7 @@ export async function findByEmployeeRequestId(
         // Fetch onboarding data to get onboardingAcceptedAt
         const onboarding = await prisma.candidate_recruitment_onboarding.findFirst({
           where: { candidate_id: Number(candidate.id) },
-          select: { onboardingAcceptedAt: true }
+          select: { onboardingAcceptedAt: true, onboardingSentAt: true }
         })
 
         return {

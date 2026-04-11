@@ -29,6 +29,7 @@ export const GenderPreferenceSchema = Type.Union([
 export const EmployeeRequestQuerySchema = Type.Object({
   ...PaginationQuerySchema.properties,
   status: Type.Optional(EmployeeRequestStatusSchema),
+  department_id: Type.Optional(Type.Integer()),
   job_title_id: Type.Optional(Type.Integer()),
   requested_by_id: Type.Optional(Type.Integer()),
   search: Type.Optional(Type.String())

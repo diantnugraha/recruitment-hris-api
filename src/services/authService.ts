@@ -15,9 +15,15 @@ export interface ManagedDepartment {
   name: string
 }
 
+export interface HeadOfDivision {
+  id: number
+  name: string
+}
+
 export interface AuthUser extends Omit<userRepository.UserWithoutPassword, never> {
   roleName: string
   managedDepartments: ManagedDepartment[]
+  headOfDivisions: HeadOfDivision[]
 }
 
 export interface AuthResult {
@@ -82,7 +88,10 @@ export async function login(data: LoginBody): Promise<AuthResult> {
     user.employeeId
       ? prisma.employee.findUnique({
           where: { employeeId: user.employeeId },
-          select: { managedDepartments: { select: { id: true, name: true } } }
+          select: {
+            managedDepartments: { select: { id: true, name: true } },
+            headOfDivisions: { select: { id: true, name: true } },
+          }
         })
       : null
   ])
@@ -91,7 +100,8 @@ export async function login(data: LoginBody): Promise<AuthResult> {
     user: {
       ...userWithoutPassword,
       roleName: normalizeRoleName(role?.roleName ?? ''),
-      managedDepartments: employeeData?.managedDepartments ?? []
+      managedDepartments: employeeData?.managedDepartments ?? [],
+      headOfDivisions: employeeData?.headOfDivisions ?? [],
     },
     token
   }
@@ -115,7 +125,10 @@ export async function getCurrentUser(userId: number): Promise<AuthUser> {
     user.employeeId
       ? prisma.employee.findUnique({
           where: { employeeId: user.employeeId },
-          select: { managedDepartments: { select: { id: true, name: true } } }
+          select: {
+            managedDepartments: { select: { id: true, name: true } },
+            headOfDivisions: { select: { id: true, name: true } },
+          }
         })
       : null
   ])
@@ -123,7 +136,8 @@ export async function getCurrentUser(userId: number): Promise<AuthUser> {
   return {
     ...user,
     roleName: normalizeRoleName(role?.roleName ?? ''),
-    managedDepartments: employeeData?.managedDepartments ?? []
+    managedDepartments: employeeData?.managedDepartments ?? [],
+    headOfDivisions: employeeData?.headOfDivisions ?? [],
   }
 }
 

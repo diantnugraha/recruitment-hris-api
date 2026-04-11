@@ -82,6 +82,38 @@ export async function create(data: {
   }
 }
 
+export async function upsertByReference(data: {
+  userId: number
+  type: string
+  title: string
+  message: string
+  referenceType: string
+  referenceId: bigint
+}): Promise<RepositoryResult<Notification>> {
+  try {
+    const notification = await prisma.notification.upsert({
+      where: {
+        referenceType_referenceId_type_userId: {
+          referenceType: data.referenceType,
+          referenceId: data.referenceId,
+          type: data.type,
+          userId: data.userId,
+        },
+      },
+      update: {
+        title: data.title,
+        message: data.message,
+        isRead: false,
+        updatedAt: new Date(),
+      },
+      create: data,
+    })
+    return success(notification)
+  } catch (error) {
+    return failure(`Failed to upsert notification: ${error}`)
+  }
+}
+
 export async function existsByReference(
   referenceType: string,
   referenceId: bigint,

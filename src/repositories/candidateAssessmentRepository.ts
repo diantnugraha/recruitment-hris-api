@@ -270,7 +270,7 @@ export async function scheduleMcu(
     const updateData: Record<string, unknown> = {
       mcu_date: mcuDate,
       mcu_location: mcuLocation,
-      updated_at: new Date()
+      updatedAt: new Date()
     }
 
     const updated = await prisma.candidate_recruitment_assessment.update({

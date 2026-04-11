@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 
 import * as roleController from '../controllers/roleController.js'
 import { authenticate } from '../middlewares/authMiddleware.js'
+import { requireHrRole } from '../middlewares/roleMiddleware.js'
 import {
   RoleQuerySchema,
   RoleIdParamSchema,
@@ -30,7 +31,10 @@ export async function roleRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: CreateRoleBody }>(
     '/',
-    { schema: { body: CreateRoleBodySchema } },
+    {
+      schema: { body: CreateRoleBodySchema },
+      preHandler: requireHrRole
+    },
     roleController.create
   )
 
@@ -40,14 +44,18 @@ export async function roleRoutes(app: FastifyInstance): Promise<void> {
       schema: {
         params: RoleIdParamSchema,
         body: UpdateRoleBodySchema
-      }
+      },
+      preHandler: requireHrRole
     },
     roleController.update
   )
 
   app.delete<{ Params: RoleIdParam }>(
     '/:id',
-    { schema: { params: RoleIdParamSchema } },
+    {
+      schema: { params: RoleIdParamSchema },
+      preHandler: requireHrRole
+    },
     roleController.remove
   )
 }

@@ -27,4 +27,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: authenticate },
     authController.me
   )
+
+  app.post(
+    '/logout',
+    { preHandler: authenticate },
+    authController.logout
+  )
 }

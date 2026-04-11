@@ -70,6 +70,7 @@ export type EmployeeRequestWithRelations = EmployeeRequest & {
 
 export type CreateEmployeeRequestData = {
   jobTitleId: number
+  departmentId?: number
   reason: string
   purpose: string
   generalJobPurpose?: string
@@ -230,7 +231,7 @@ function buildRoleWhereClause(roleFilter: RoleFilter): Record<string, unknown> {
     return {
       OR: [
         { createdBy: userId },
-        { statusEmployeeRequest: { in: [2, 3, 4, 5, 6, 7] } },
+        { statusEmployeeRequest: { in: [8, 2, 3, 4, 5, 6, 7] } },
       ],
     }
   }
@@ -249,6 +250,7 @@ export async function findAll(
     const where: Prisma.EmployeeRequestWhereInput = {
       isDeleted: 0,
       ...(filters.status && { statusEmployeeRequest: STATUS_REVERSE_MAP[filters.status] ?? 0 }),
+      ...(filters.departmentId && { departmentId: filters.departmentId }),
       ...(filters.jobTitleId && { jobTitleId: filters.jobTitleId }),
       ...(filters.requestedById && { createdBy: filters.requestedById }),
       AND: [
@@ -329,6 +331,7 @@ export async function create(data: CreateEmployeeRequestData): Promise<Repositor
       data: {
         code,
         jobTitleId: data.jobTitleId,
+        ...(data.departmentId && { departmentId: data.departmentId }),
         reason: data.reason,
         purpose: data.purpose,
         generalJobPurpose: data.generalJobPurpose || data.purpose,

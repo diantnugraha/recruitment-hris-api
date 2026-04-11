@@ -53,6 +53,28 @@ export const GENDER_PREFERENCE = {
 
 export type GenderPreference = typeof GENDER_PREFERENCE[keyof typeof GENDER_PREFERENCE]
 
+// Notification Types for Employee Request workflow
+export const ER_NOTIFICATION_TYPE = {
+  SUBMITTED: 'employee_request_submitted',
+  HOD_APPROVED: 'employee_request_hod_approved',
+  HR_APPROVED: 'employee_request_hr_approved',
+  APPROVED: 'employee_request_approved',
+  REVISED: 'employee_request_revised',
+  REJECTED: 'employee_request_rejected',
+} as const
+
+export type ErNotificationType = typeof ER_NOTIFICATION_TYPE[keyof typeof ER_NOTIFICATION_TYPE]
+
+// Notification action labels and colors for email templates
+export const ER_NOTIFICATION_CONFIG: Record<ErNotificationType, { label: string; color: string }> = {
+  [ER_NOTIFICATION_TYPE.SUBMITTED]: { label: 'Submitted for Review', color: '#0032A0' },
+  [ER_NOTIFICATION_TYPE.HOD_APPROVED]: { label: 'Approved by Head of Division', color: '#0032A0' },
+  [ER_NOTIFICATION_TYPE.HR_APPROVED]: { label: 'Reviewed by HR', color: '#0032A0' },
+  [ER_NOTIFICATION_TYPE.APPROVED]: { label: 'Approved by Management', color: '#16a34a' },
+  [ER_NOTIFICATION_TYPE.REVISED]: { label: 'Revision Requested', color: '#f59e0b' },
+  [ER_NOTIFICATION_TYPE.REJECTED]: { label: 'Rejected', color: '#dc2626' },
+}
+
 // Comment Action Types
 export const COMMENT_ACTION = {
   CREATED: 'created',
