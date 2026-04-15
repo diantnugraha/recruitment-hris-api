@@ -51,7 +51,7 @@ export async function create(
     year: request.body.year,
     technical: request.body.technical ?? 0,
     admin: request.body.admin ?? 0,
-    document: request.body.document
+    ...(request.body.document !== undefined && { document: request.body.document })
   }
 
   const budget = await employeeBudgetService.createEmployeeBudget(data)

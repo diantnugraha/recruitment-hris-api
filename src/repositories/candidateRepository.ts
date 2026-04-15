@@ -395,7 +395,7 @@ export async function update(id: number, data: UpdateCandidateData): Promise<Rep
     updateData.updatedAt = new Date()
 
     // Debug: Log what we're sending to Prisma
-    console.log('[DEBUG] repository.update - updateData for Prisma:', JSON.stringify(updateData, (key, value) =>
+    console.log('[DEBUG] repository.update - updateData for Prisma:', JSON.stringify(updateData, (_key, value) =>
       typeof value === 'bigint' ? value.toString() : value
     , 2))
 

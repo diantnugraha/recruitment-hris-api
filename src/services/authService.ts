@@ -57,7 +57,15 @@ export async function register(data: RegisterBody): Promise<AuthResult> {
   const user = createResult.getValue()
   const token = generateToken({ userId: user.id, email: user.email })
 
-  return { user, token }
+  return {
+    user: {
+      ...user,
+      roleName: '',
+      managedDepartments: [],
+      headOfDivisions: [],
+    },
+    token
+  }
 }
 
 export async function login(data: LoginBody): Promise<AuthResult> {
@@ -144,5 +152,5 @@ export async function getCurrentUser(userId: number): Promise<AuthUser> {
 function generateToken(payload: JwtTokenPayload): string {
   return jwt.sign(payload, JWT_CONFIG.secret, {
     expiresIn: JWT_CONFIG.expiresIn
-  })
+  } as jwt.SignOptions)
 }

@@ -526,7 +526,7 @@ export async function addComment(
   comment: string
 ): Promise<{
   id: bigint
-  employeeRequestId: number
+  employeeRequestId: bigint
   comment: string
   userId: number
   createdAt: Date | null

@@ -237,7 +237,13 @@ export async function update(id: number, data: UpdateEmployeeData): Promise<Repo
     if (data.gender !== undefined) updateData.employeeGender = data.gender
     if (data.status !== undefined) updateData.employeeStatus = data.status
     if (data.title !== undefined) updateData.employeeTitle = data.title
-    if (data.departmentId !== undefined) updateData.department = { connect: { id: data.departmentId } }
+    if (data.departmentId !== undefined) {
+      if (data.departmentId === null) {
+        updateData.department = { disconnect: true }
+      } else {
+        updateData.department = { connect: { id: data.departmentId } }
+      }
+    }
     if (data.location !== undefined) updateData.employeeLocation = data.location
     if (data.businessUnit !== undefined) updateData.employeeBu = data.businessUnit
     if (data.extension !== undefined) updateData.employeeExt = data.extension

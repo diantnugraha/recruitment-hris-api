@@ -16,7 +16,7 @@ export type PaginationParams = {
 }
 
 export type DivisionWithRelations = Division & {
-  obs?: { id: number; name: string } | null
+  obs?: { id: bigint; name: string } | null
   headOfDivision?: { employeeId: number; employeeName: string | null } | null
   deputyHead?: { employeeId: number; employeeName: string | null } | null
   _count?: { departments: number }

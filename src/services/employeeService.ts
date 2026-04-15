@@ -187,9 +187,9 @@ function autoCreateUserForEmployee(employee: Employee, email: string, name: stri
         email,
         name,
         password: plainPassword,
-        roleId,
+        ...(roleId !== undefined && { roleId }),
         employeeId: employee.employeeId,
-        superiorId: employee.superiorId ?? undefined
+        ...(employee.superiorId != null && { superiorId: employee.superiorId })
       })
     })
     .catch((error) => {
@@ -244,7 +244,12 @@ export async function updateEmployee(id: number, data: UpdateEmployeeServiceData
     await clearStructuralPositions(id)
   }
 
-  const result = await employeeRepository.update(id, data)
+  const { superiorId, ...restData } = data
+  const repoData = {
+    ...restData,
+    ...(superiorId !== undefined && superiorId !== null && { superiorId })
+  }
+  const result = await employeeRepository.update(id, repoData)
 
   if (result.isFailure()) {
     throw new Error(result.error)

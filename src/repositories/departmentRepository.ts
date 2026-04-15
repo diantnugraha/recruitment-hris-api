@@ -8,7 +8,7 @@ export type DepartmentWithRelations = Department & {
     id: number
     name: string
     isManagement: boolean
-    obs?: { id: number; name: string } | null
+    obs?: { id: bigint; name: string } | null
   } | null
   manager?: { employeeId: number; employeeName: string | null } | null
   _count?: { employees: number; jobTitles: number }

@@ -89,11 +89,11 @@ export async function createUser(data: CreateUserServiceData): Promise<UserWitho
   const createData: CreateUserRestData = {
     displayName: data.displayName,
     email: data.email,
-    name: data.name,
+    ...(data.name !== undefined && { name: data.name }),
     password: hashedPassword,
-    roleId: data.roleId,
-    employeeId: data.employeeId,
-    superiorId: data.superiorId
+    ...(data.roleId !== undefined && { roleId: data.roleId }),
+    ...(data.employeeId !== undefined && { employeeId: data.employeeId }),
+    ...(data.superiorId !== undefined && { superiorId: data.superiorId })
   }
 
   const result = await userRestRepository.create(createData)
@@ -108,7 +108,7 @@ export async function createUser(data: CreateUserServiceData): Promise<UserWitho
     .sendWelcomeEmail({
       email: user.email,
       displayName: user.displayName,
-      password: data.password
+      ...(data.password !== undefined && { password: data.password })
     })
     .catch((error) => {
       console.error('Failed to send welcome email:', error)
@@ -144,10 +144,10 @@ export async function updateUser(id: number, data: UpdateUserServiceData): Promi
   const updateData: UpdateUserRestData = {
     displayName: data.displayName,
     email: data.email,
-    name: data.name,
-    roleId: data.roleId,
-    employeeId: data.employeeId,
-    superiorId: data.superiorId
+    ...(data.name !== undefined && { name: data.name }),
+    ...(data.roleId !== undefined && { roleId: data.roleId }),
+    ...(data.employeeId !== undefined && { employeeId: data.employeeId }),
+    ...(data.superiorId !== undefined && { superiorId: data.superiorId })
   }
 
   const result = await userRestRepository.update(id, updateData)

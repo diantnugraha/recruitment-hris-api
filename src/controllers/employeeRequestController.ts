@@ -81,7 +81,7 @@ function transformEmployeeRequest(request: EmployeeRequestWithRelations) {
     } : null,
     comments: request.comments?.map((c: {
       id: bigint
-      employeeRequestId: number
+      employeeRequestId: bigint
       userId: number
       comment: string
       createdAt: Date | null

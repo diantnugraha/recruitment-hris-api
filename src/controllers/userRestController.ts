@@ -23,10 +23,12 @@ export async function getAll(
     ...(search && { display_name: search })
   }
 
+  const validOrderBy = (orderby === 'name' ? orderby : 'name') as 'name' | 'email' | 'displayName'
+
   const pagination = {
     page,
     limit,
-    orderBy: orderby || 'name',
+    orderBy: validOrderBy,
     direction: direction || 'asc'
   }
 
@@ -55,11 +57,11 @@ export async function create(
   const data = {
     displayName: request.body.displayName,
     email: request.body.email,
-    name: request.body.name,
-    password: request.body.password,
-    roleId: request.body.roleId,
-    employeeId: request.body.employeeId,
-    superiorId: request.body.superiorId
+    ...(request.body.name !== undefined && { name: request.body.name }),
+    ...(request.body.password !== undefined && { password: request.body.password }),
+    ...(request.body.roleId !== undefined && { roleId: request.body.roleId }),
+    ...(request.body.employeeId !== undefined && { employeeId: request.body.employeeId }),
+    ...(request.body.superiorId !== undefined && { superiorId: request.body.superiorId })
   }
 
   const user = await userRestService.createUser(data)
@@ -75,11 +77,11 @@ export async function update(
   const data = {
     displayName: request.body.displayName,
     email: request.body.email,
-    name: request.body.name,
-    newPassword: request.body.newPassword,
-    roleId: request.body.roleId,
-    employeeId: request.body.employeeId,
-    superiorId: request.body.superiorId
+    ...(request.body.name !== undefined && { name: request.body.name }),
+    ...(request.body.newPassword !== undefined && { newPassword: request.body.newPassword }),
+    ...(request.body.roleId !== undefined && { roleId: request.body.roleId }),
+    ...(request.body.employeeId !== undefined && { employeeId: request.body.employeeId }),
+    ...(request.body.superiorId !== undefined && { superiorId: request.body.superiorId })
   }
 
   const user = await userRestService.updateUser(id, data)

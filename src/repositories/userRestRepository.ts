@@ -1,16 +1,37 @@
-import type { User, Role, Employee, UserFile } from '@prisma/client'
-import type { Prisma } from '@prisma/client'
+import type { User, Prisma } from '@prisma/client'
 
 import { prisma } from '../config/database.js'
 import { type RepositoryResult, success, failure } from './types.js'
 
-export type UserWithRelations = User & {
-  role: Role
-  employee: Employee | null
-  files: UserFile[]
+export type UserWithoutPassword = {
+  id: number
+  name: string | null
+  email: string
+  displayName: string
+  roleId: number
+  employeeId: number | null
+  superiorId: number | null
+  emailVerifiedAt: Date | null
+  created_at: Date | null
+  updated_at: Date | null
+  role: {
+    roleId: number
+    roleName: string | null
+  }
+  employee: {
+    employeeId: number
+    employeeName: string
+    employeeEmail: string | null
+    employeeTitle: string | null
+    employeeStatus: string
+  } | null
+  files: {
+    id: number
+    name: string
+    type: string
+    location: string
+  }[]
 }
-
-export type UserWithoutPassword = Omit<UserWithRelations, 'password' | 'trash' | 'rememberToken' | 'userImei'>
 
 export type CreateUserRestData = {
   displayName: string
@@ -57,7 +78,7 @@ const userSelectFields = {
   roleId: true,
   employeeId: true,
   superiorId: true,
-  // emailVerifiedAt: true, // temporarily disabled to test
+  emailVerifiedAt: true,
   created_at: true,
   updated_at: true,
   role: {
@@ -145,8 +166,8 @@ export async function create(data: CreateUserRestData): Promise<RepositoryResult
         name: data.name ?? data.displayName,
         password: data.password || '',
         roleId: data.roleId || 1,
-        employeeId: data.employeeId,
-        superiorId: data.superiorId
+        ...(data.employeeId !== undefined && { employeeId: data.employeeId }),
+        ...(data.superiorId !== undefined && { superiorId: data.superiorId })
       },
       select: userSelectFields
     })
@@ -164,10 +185,10 @@ export async function update(id: number, data: UpdateUserRestData): Promise<Repo
       data: {
         displayName: data.displayName,
         email: data.email,
-        name: data.name,
-        roleId: data.roleId,
-        employeeId: data.employeeId,
-        superiorId: data.superiorId,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.roleId !== undefined && { roleId: data.roleId }),
+        ...(data.employeeId !== undefined && { employeeId: data.employeeId }),
+        ...(data.superiorId !== undefined && { superiorId: data.superiorId }),
         updated_at: new Date()
       },
       select: userSelectFields

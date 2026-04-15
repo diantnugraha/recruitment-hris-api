@@ -5,8 +5,7 @@ import { EMPLOYEE_BUDGET_ERRORS, CURRENT_YEAR } from '../constants/employeeBudge
 import type {
   EmployeeBudgetWithRelations,
   EmployeeBudgetFilters,
-  PaginationParams,
-  EmployeeCountByCategory
+  PaginationParams
 } from '../repositories/employeeBudgetRepository.js'
 
 export type CreateEmployeeBudgetServiceData = {

@@ -125,8 +125,8 @@ export async function create(data: CreateEmployeeBudgetData): Promise<Repository
         year: data.year,
         technical: data.technical,
         admin: data.admin,
-        document: data.document,
-        documentName: data.documentName
+        ...(data.document !== undefined && { document: data.document }),
+        ...(data.documentName !== undefined && { documentName: data.documentName })
       },
       select: employeeBudgetSelectFields
     })
