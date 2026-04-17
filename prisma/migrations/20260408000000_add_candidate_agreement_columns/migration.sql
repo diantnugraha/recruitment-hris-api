@@ -1,4 +1,2 @@
--- AddColumn: agreement acceptance tracking on candidate_recruitment
-ALTER TABLE `candidate_recruitment`
-  ADD COLUMN `agreement_accepted_at` TIMESTAMP(0) NULL,
-  ADD COLUMN `agreement_version` VARCHAR(20) NULL;
+-- No-op: columns agreement_accepted_at and agreement_version
+-- already exist in the init migration (20250101000000_init)

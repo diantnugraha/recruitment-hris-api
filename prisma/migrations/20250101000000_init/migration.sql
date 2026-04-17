@@ -389,6 +389,39 @@ CREATE TABLE `candidate_recruitment_course_experience` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `facillities` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `inventory_no` VARCHAR(255) NOT NULL,
+    `item` VARCHAR(255) NOT NULL,
+    `qty` INTEGER NOT NULL DEFAULT 1,
+    `unit` VARCHAR(50) NOT NULL,
+    `condition` VARCHAR(50) NOT NULL,
+    `status` VARCHAR(50) NOT NULL,
+    `created_at` TIMESTAMP(0) NULL DEFAULT CURRENT_TIMESTAMP(0),
+    `updated_at` TIMESTAMP(0) NULL,
+    `candidate_recruitment_onboarding_id` INTEGER NOT NULL,
+
+    INDEX `facillities_candidate_recruitment_onboarding_id_idx`(`candidate_recruitment_onboarding_id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `onboarding_program` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `candidate_recruitment_onboarding_id` INTEGER NOT NULL,
+    `program` VARCHAR(255) NOT NULL,
+    `date` VARCHAR(50) NOT NULL,
+    `location` VARCHAR(255) NOT NULL,
+    `pic` VARCHAR(255) NOT NULL,
+    `status` VARCHAR(50) NOT NULL,
+    `created_at` TIMESTAMP(0) NULL DEFAULT CURRENT_TIMESTAMP(0),
+    `updated_at` TIMESTAMP(0) NULL,
+
+    INDEX `onboarding_program_candidate_recruitment_onboarding_id_idx`(`candidate_recruitment_onboarding_id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `users` ADD CONSTRAINT `users_role_id_fkey` FOREIGN KEY (`role_id`) REFERENCES `role_access`(`role_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 

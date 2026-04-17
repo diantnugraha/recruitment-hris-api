@@ -1,18 +1,18 @@
 -- Rename reviewed_at to hr_reviewed_at
 ALTER TABLE `employee_request` CHANGE COLUMN `reviewed_at` `hr_reviewed_at` TIMESTAMP NULL DEFAULT NULL;
 
--- Add department_id (BIGINT UNSIGNED to match departments.id)
-ALTER TABLE `employee_request` ADD COLUMN `department_id` BIGINT UNSIGNED NULL AFTER `created_by`;
+-- Add department_id (INTEGER to match departments.id)
+ALTER TABLE `employee_request` ADD COLUMN `department_id` INTEGER NULL AFTER `created_by`;
 ALTER TABLE `employee_request` ADD CONSTRAINT `fk_employee_request_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL;
 
--- Add audit trail columns (BIGINT UNSIGNED to match users.id)
-ALTER TABLE `employee_request` ADD COLUMN `hod_reviewed_by` BIGINT UNSIGNED NULL AFTER `department_id`;
+-- Add audit trail columns (INTEGER to match users.id)
+ALTER TABLE `employee_request` ADD COLUMN `hod_reviewed_by` INTEGER NULL AFTER `department_id`;
 ALTER TABLE `employee_request` ADD COLUMN `hod_reviewed_at` TIMESTAMP NULL DEFAULT NULL AFTER `hod_reviewed_by`;
-ALTER TABLE `employee_request` ADD COLUMN `hr_reviewed_by` BIGINT UNSIGNED NULL AFTER `hod_reviewed_at`;
-ALTER TABLE `employee_request` ADD COLUMN `approved_by` BIGINT UNSIGNED NULL AFTER `approved_at`;
-ALTER TABLE `employee_request` ADD COLUMN `revised_by` BIGINT UNSIGNED NULL AFTER `approved_by`;
+ALTER TABLE `employee_request` ADD COLUMN `hr_reviewed_by` INTEGER NULL AFTER `hod_reviewed_at`;
+ALTER TABLE `employee_request` ADD COLUMN `approved_by` INTEGER NULL AFTER `approved_at`;
+ALTER TABLE `employee_request` ADD COLUMN `revised_by` INTEGER NULL AFTER `approved_by`;
 ALTER TABLE `employee_request` ADD COLUMN `revised_at` TIMESTAMP NULL DEFAULT NULL AFTER `revised_by`;
-ALTER TABLE `employee_request` ADD COLUMN `rejected_by` BIGINT UNSIGNED NULL AFTER `revised_at`;
+ALTER TABLE `employee_request` ADD COLUMN `rejected_by` INTEGER NULL AFTER `revised_at`;
 ALTER TABLE `employee_request` ADD COLUMN `rejected_at` TIMESTAMP NULL DEFAULT NULL AFTER `rejected_by`;
 
 -- Add foreign keys for audit columns

@@ -29,6 +29,21 @@ ALTER TABLE `obs`
   ADD COLUMN `code` VARCHAR(50) NULL;
 
 -- ============================================
+-- STEP 3b: Drop departments.obs_id (moved to divisions)
+-- Must drop FK and column before altering obs.id type
+-- ============================================
+ALTER TABLE `departments` DROP FOREIGN KEY `departments_obs_id_fkey`;
+DROP INDEX `departments_obs_id_idx` ON `departments`;
+ALTER TABLE `departments` DROP COLUMN `obs_id`;
+
+-- ============================================
+-- STEP 3c: Alter obs.id from INTEGER to BIGINT UNSIGNED
+-- (Prisma schema declares @db.UnsignedBigInt but init migration created as INTEGER)
+-- ============================================
+ALTER TABLE `obs`
+  MODIFY COLUMN `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT;
+
+-- ============================================
 -- STEP 4: Create indexes
 -- ============================================
 CREATE INDEX `divisions_obs_id_idx` ON `divisions`(`obs_id`);
